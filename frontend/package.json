@@ -14,7 +14,8 @@
     "lucide-react": "latest",
     "recharts": "latest",
     "d3": "latest",
-    "@google/genai": "latest"
+    "@google/genai": "latest",
+    "@supabase/supabase-js": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",

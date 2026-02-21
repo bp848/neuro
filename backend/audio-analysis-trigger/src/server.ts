@@ -4,6 +4,7 @@ import { PubSub } from '@google-cloud/pubsub';
 import { VertexAI } from '@google-cloud/vertexai';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
@@ -14,52 +15,74 @@ const storage = new Storage();
 const pubsub = new PubSub();
 const PORT = process.env.PORT || 8080;
 
+// Initialize Supabase
+const supabase = createClient(
+    process.env.SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || '' // Use service role for backend updates
+);
+
 const vertexAI = new VertexAI({
     project: process.env.GOOGLE_CLOUD_PROJECT || '',
-    location: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1'
+    location: process.env.GOOGLE_CLOUD_LOCATION || 'asia-northeast1'
 });
 
 const generativeModel = vertexAI.getGenerativeModel({
     model: 'gemini-1.5-pro-002',
 });
 
-app.post('/trigger', async (req, res) => {
-    // Cloud Pub/Sub push subscription sends messages in this format
+app.post('/trigger', async (req: any, res: any) => {
     const message = req.body.message;
     if (!message || !message.data) {
         return res.status(400).send('Invalid Pub/Sub message');
     }
 
-    const data = JSON.parse(Buffer.from(message.data, 'base64').toString());
-    const { bucket, name } = data; // GCS event data
+    const eventData = JSON.parse(Buffer.from(message.data, 'base64').toString());
+    const { bucket, name, metadata } = eventData;
 
     if (!bucket || !name) {
         return res.status(400).send('Incomplete GCS event data');
     }
 
-    try {
-        console.log(`Analyzing file: gs://${bucket}/${name}`);
+    // Try to find jobId in metadata (passed from frontend)
+    const jobId = eventData.metadata?.jobId || name.split('/').pop()?.split('_')[0];
 
-        // 1. Prepare prompt for Gemini
+    try {
+        console.log(`Analyzing file: gs://${bucket}/${name} for job: ${jobId}`);
+
+        if (jobId) {
+            await supabase.from('mastering_jobs').update({ status: 'analyzing' }).eq('id', jobId);
+        }
+
         const prompt = `
-      You are an expert audio engineer specializing in Beatport Top 10 electronic music.
-      Analyze the provided audio file (metadata: ${name}) and determine the optimal DSP mastering parameters.
+      You are an AI mastering system designed to dominate the Beatport Top 10 (Tech House, Melodic Techno, Peak Time Techno).
+      Analyze the provided audio and reach a consensus through three specialized agent personas:
       
-      Benchmarks for Beatport Top 10:
-      - LUFS: -7 to -9 dB
-      - Key: Harmonic alignment is critical.
-      - Low End: Tight, 30Hz cut, 55Hz punch.
+      1. **Audience Persona**: Focuses on energy, impact, and "vibe". Wants it loud and exciting. Prioritizes the "kick and bass" relationship for festival systems.
+      2. **A&R Persona**: Focuses on market compatibility and translation. Compares it to current Top 10 standards from labels like Afterlife, Drumcode, or Catch & Release.
+      3. **Engineer Persona**: Focuses on technical integrity, phase, and dynamic range. Ensures the high-end is "expensive" sounding and prevents inter-sample peaks.
       
-      Respond only in JSON format with the following fields:
+      Provide:
+      - 20 technical metrics (name, value, target, unit, status: low/optimal/high, description).
+      - Discussion opinions for each persona.
+      - Final agreed-upon DSP parameters.
+      
+      Respond ONLY in JSON format:
       {
-        "tube_drive_amount": (0-1),
-        "low_contour_amount": (0-2.5),
-        "limiter_ceiling_db": (-1.0 to -0.1),
-        "target_lufs": (-9 to -7)
+        "metrics": [...],
+        "opinions": [
+            {"role": "Audience", "comment": "...", "suggestedParams": {...}},
+            {"role": "A&R", "comment": "...", "suggestedParams": {...}},
+            {"role": "Engineer", "comment": "...", "suggestedParams": {...}}
+        ],
+        "finalParams": {
+            "tube_drive_amount": (0-1),
+            "low_contour_amount": (0-2.5),
+            "limiter_ceiling_db": (-1.0 to -0.1),
+            "target_lufs": (-9.0 to -7.0)
+        }
       }
     `;
 
-        // 2. Call Gemini
         const audioFilePath = `gs://${bucket}/${name}`;
         const result = await generativeModel.generateContent({
             contents: [
@@ -67,7 +90,7 @@ app.post('/trigger', async (req, res) => {
                     role: 'user',
                     parts: [
                         { text: prompt },
-                        { fileData: { fileUri: audioFilePath, mimeType: 'audio/wav' } } // Assuming WAV, adjust if needed
+                        { fileData: { fileUri: audioFilePath, mimeType: 'audio/wav' } }
                     ]
                 }
             ],
@@ -77,40 +100,48 @@ app.post('/trigger', async (req, res) => {
         });
 
         const aiResponseText = result.response.candidates?.[0].content.parts[0].text;
-        if (!aiResponseText) {
-            throw new Error('No response from Gemini');
+        if (!aiResponseText) throw new Error('No response from Gemini');
+
+        const analysisResult = JSON.parse(aiResponseText);
+        console.log('Gemini Analysis & Consensus achieved.');
+
+        // 3. Update Supabase
+        if (jobId) {
+            await supabase.from('mastering_jobs').update({
+                status: 'processing',
+                metrics: analysisResult.metrics,
+                consensus_opinions: analysisResult.opinions,
+                final_params: analysisResult.finalParams
+            }).eq('id', jobId);
         }
 
-        const dspParams = JSON.parse(aiResponseText);
-        console.log('Gemini Analysis Results:', dspParams);
-
-        // 3. Orchestrate the next step: Push to dsp-params-topic
+        // 4. Trigger DSP Engine
         const topicName = process.env.DSP_PARAMS_TOPIC || 'dsp-params-topic';
         const outputBucket = process.env.OUTPUT_BUCKET || 'aidriven-mastering-output';
-        const outputPath = `mastered/${path.basename(name)}`;
+        const outputPath = `mastered/${jobId || Date.now()}_${path.basename(name)}`;
 
         const masteringTask = {
+            jobId: jobId,
             inputBucket: bucket,
             inputPath: name,
             outputBucket: outputBucket,
             outputPath: outputPath,
-            params: {
-                tube_drive_amount: dspParams.tube_drive_amount,
-                low_contour_amount: dspParams.low_contour_amount,
-                limiter_ceiling_db: dspParams.limiter_ceiling_db
-            },
-            targetLUFS: dspParams.target_lufs
+            params: analysisResult.finalParams,
+            targetLUFS: analysisResult.finalParams.target_lufs
         };
 
         const messageId = await pubsub.topic(topicName).publishMessage({
             json: masteringTask
         });
 
-        console.log(`Mastering task published to ${topicName} (ID: ${messageId})`);
-
+        console.log(`Task published to DSP engine (ID: ${messageId})`);
         res.status(200).send(`Success: Task ${messageId} published`);
+
     } catch (error: any) {
         console.error('Error in analysis trigger:', error);
+        if (jobId) {
+            await supabase.from('mastering_jobs').update({ status: 'failed' }).eq('id', jobId);
+        }
         res.status(500).send(`Analysis failed: ${error.message || 'Unknown error'}`);
     }
 });

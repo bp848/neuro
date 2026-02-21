@@ -25,6 +25,8 @@ if (!(& $GSUTIL ls -p $PROJECT_ID | Select-String "gs://$INPUT_BUCKET/")) {
 if (!(& $GSUTIL ls -p $PROJECT_ID | Select-String "gs://$OUTPUT_BUCKET/")) {
     & $GSUTIL mb -p $PROJECT_ID -l $REGION gs://$OUTPUT_BUCKET
 }
+& $GSUTIL cors set cors.json gs://$INPUT_BUCKET
+& $GSUTIL cors set cors.json gs://$OUTPUT_BUCKET
 
 # 3. Create Artifact Registry
 Write-Host "Creating Artifact Registry..."
@@ -41,6 +43,9 @@ if (!(& $GCLOUD pubsub topics list --project $PROJECT_ID | Select-String "topics
     & $GCLOUD pubsub topics create $TOPIC_DSP --project $PROJECT_ID
 }
 
+$SUPABASE_URL = "https://llulqbamoimcgxsrjbiv.supabase.co"
+$SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxsdWxxYmFtb2ltY2d4c3JqYml2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2OTAyOTksImV4cCI6MjA3ODI2NjI5OX0.P3ma6EfoY9p2cTP-sKr4V879LJFtMRpShrYX59wEdRM"
+
 # 5. Build and Deploy DSP Mastering Engine (Python)
 Write-Host "Deploying DSP Mastering Engine..."
 cd backend/dsp-mastering-engine
@@ -50,7 +55,7 @@ cd backend/dsp-mastering-engine
   --region $REGION `
   --platform managed `
   --allow-unauthenticated `
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=$REGION" `
+  --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=$REGION,SUPABASE_URL=$SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_KEY" `
   --project $PROJECT_ID
 $DSP_URL = (& $GCLOUD run services describe dsp-mastering-engine --platform managed --region $REGION --format 'value(status.url)' --project $PROJECT_ID)
 cd ../..
@@ -73,11 +78,21 @@ cd backend/audio-analysis-trigger
   --region $REGION `
   --platform managed `
   --allow-unauthenticated `
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=$REGION,DSP_PARAMS_TOPIC=$TOPIC_DSP,OUTPUT_BUCKET=$OUTPUT_BUCKET" `
+  --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=$REGION,DSP_PARAMS_TOPIC=$TOPIC_DSP,OUTPUT_BUCKET=$OUTPUT_BUCKET,SUPABASE_URL=$SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_KEY" `
   --project $PROJECT_ID
+$ANALYSIS_URL = (& $GCLOUD run services describe audio-analysis-trigger --platform managed --region $REGION --format 'value(status.url)' --project $PROJECT_ID)
 cd ../..
 
-# 8. Configure GCS Trigger for Analysis
+# 8. Set up Pub/Sub Push for Analysis Trigger
+Write-Host "Configuring Pub/Sub push to Analysis Trigger..."
+if (!(& $GCLOUD pubsub subscriptions list --project $PROJECT_ID | Select-String "subscriptions/analysis-trigger-sub")) {
+    & $GCLOUD pubsub subscriptions create analysis-trigger-sub `
+      --topic $TOPIC_UPLOAD `
+      --push-endpoint="$ANALYSIS_URL/trigger" `
+      --project $PROJECT_ID
+}
+
+# 9. Configure GCS Trigger for Analysis
 Write-Host "Setting up GCS notification trigger..."
 $PROJECT_NUMBER = (& $GCLOUD projects describe $PROJECT_ID --format="value(projectNumber)")
 $GCS_SERVICE_ACCOUNT = "service-$PROJECT_NUMBER@gs-project-accounts.iam.gserviceaccount.com"

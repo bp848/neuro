@@ -6,9 +6,8 @@ import { AnalysisView } from './components/AnalysisView';
 import { AgentConsensus } from './components/AgentConsensus';
 import { AudioComparisonPlayer } from './components/AudioComparisonPlayer';
 import { MasteringState, MasteringParams } from './types';
-import { analyzeAudioWithGemini, getAgentConsensus } from './services/geminiService';
-import { buildMasteringChain, optimizeMasteringParams } from './services/dspEngine';
 import { Download, RefreshCw, CheckCircle2, Loader2, Waves } from 'lucide-react';
+import { supabase } from './services/supabaseClient';
 
 const App: React.FC = () => {
   const [state, setState] = useState<MasteringState>({
@@ -23,48 +22,100 @@ const App: React.FC = () => {
     masteredBuffer: null,
   });
 
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [audioContext] = useState(() => new (window.AudioContext || (window as any).webkitAudioContext)());
 
+  // Subscribe to real-time updates for the active job
+  React.useEffect(() => {
+    if (!activeJobId) return;
+
+    const fetchAndDecodeMaster = async (url: string) => {
+      try {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        const decoded = await audioContext.decodeAudioData(arrayBuffer);
+        setState(prev => ({ ...prev, masteredBuffer: decoded }));
+      } catch (e) {
+        console.error("Failed to decode mastered audio:", e);
+      }
+    };
+
+    const channel = supabase
+      .channel(`job-${activeJobId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'mastering_jobs', filter: `id=eq.${activeJobId}` },
+        (payload) => {
+          const job = payload.new;
+          console.log('Job Update:', job);
+
+          const publicUrl = job.output_path ? job.output_path.replace('gs://', 'https://storage.googleapis.com/') : null;
+
+          setState(prev => ({
+            ...prev,
+            step: job.status,
+            analysis: job.metrics,
+            consensus: job.consensus_opinions,
+            finalParams: job.final_params,
+            outputUrl: publicUrl,
+            progress: job.status === 'analyzing' ? 40 : job.status === 'processing' ? 70 : job.status === 'completed' ? 100 : prev.progress
+          }));
+
+          if (job.status === 'completed' && publicUrl) {
+            fetchAndDecodeMaster(publicUrl);
+            channel.unsubscribe();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { channel.unsubscribe(); };
+  }, [activeJobId, audioContext]);
+
   const handleUpload = async (file: File) => {
-    setState(prev => ({ ...prev, step: 'uploading', fileName: file.name }));
-    
-    await new Promise(r => setTimeout(r, 2500));
-    
-    const arrayBuffer = await file.arrayBuffer();
-    const decoded = await audioContext.decodeAudioData(arrayBuffer);
+    setState(prev => ({ ...prev, step: 'uploading', progress: 5, fileName: file.name }));
 
-    setState(prev => ({ ...prev, step: 'analyzing', progress: 20, originalBuffer: decoded }));
-    
     try {
-      const metrics = await analyzeAudioWithGemini(file.name);
-      setState(prev => ({ ...prev, analysis: metrics, step: 'consensus', progress: 50 }));
-      
-      const { opinions, finalParams } = await getAgentConsensus(metrics);
-      setState(prev => ({ ...prev, consensus: opinions, finalParams, step: 'processing', progress: 80 }));
+      // Decode locally for original player
+      const arrayBuffer = await file.arrayBuffer();
+      const originalBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      setState(prev => ({ ...prev, originalBuffer }));
+      // 1. Create Job in Supabase
+      const { data: job, error: jobErr } = await supabase
+        .from('mastering_jobs')
+        .insert({ file_name: file.name, status: 'uploading', input_path: '' })
+        .select()
+        .single();
 
-      // Prepare buffers for DSP
-      const left = decoded.getChannelData(0).slice();
-      const right = decoded.numberOfChannels > 1 ? decoded.getChannelData(1).slice() : left.slice();
-      
-      const optimized = optimizeMasteringParams(left, right, decoded.sampleRate, -8.5, finalParams);
-      buildMasteringChain(left, right, decoded.sampleRate, optimized.params);
-      
-      // Create a new AudioBuffer for the mastered version
-      const masteredBuffer = audioContext.createBuffer(2, left.length, decoded.sampleRate);
-      masteredBuffer.copyToChannel(left, 0);
-      masteredBuffer.copyToChannel(right, 1);
-      
-      setState(prev => ({ 
-        ...prev, 
-        step: 'completed', 
-        progress: 100, 
-        finalParams: optimized.params,
-        masteredBuffer,
-        outputUrl: 'https://storage.googleapis.com/beatport-ai-mastering/results/mastered_' + file.name 
-      }));
+      if (jobErr) throw jobErr;
+      setActiveJobId(job.id);
+
+      // 2. Get Signed URL for GCS upload
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, contentType: file.type, jobId: job.id }),
+      });
+      const { url, path } = await response.json();
+
+      // 3. Upload directly to GCS
+      await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type,
+          'x-goog-meta-jobId': job.id
+        },
+        body: file,
+      });
+
+      // 4. Update job with the actual path
+      await supabase.from('mastering_jobs').update({ input_path: path }).eq('id', job.id);
+
+      setState(prev => ({ ...prev, progress: 20 }));
+
     } catch (error) {
       console.error("Mastering failed:", error);
-      setState(prev => ({ ...prev, step: 'idle' }));
+      setState(prev => ({ ...prev, step: 'idle', progress: 0 }));
     }
   };
 
@@ -85,7 +136,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen pb-32 pt-24">
       <Header />
-      
+
       <main className="max-w-7xl mx-auto px-8">
         {state.step === 'idle' && (
           <div className="flex flex-col items-center justify-center min-h-[70vh] text-center space-y-12">
@@ -94,7 +145,7 @@ const App: React.FC = () => {
                 <Waves className="w-3 h-3" /> Next-Gen Audio Intelligence
               </div>
               <h2 className="text-6xl md:text-8xl font-black tracking-tighter leading-none text-white">
-                MASTERING <br/>
+                MASTERING <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-500 to-purple-600 glow-text">REDEFINED.</span>
               </h2>
               <p className="text-lg text-gray-400 max-w-2xl mx-auto font-light leading-relaxed">
@@ -112,7 +163,7 @@ const App: React.FC = () => {
               <div className="relative w-48 h-48 flex items-center justify-center">
                 <svg className="w-full h-full -rotate-90">
                   <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-white/5" />
-                  <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="4" fill="transparent" 
+                  <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="4" fill="transparent"
                     strokeDasharray={552} strokeDashoffset={552 - (552 * state.progress) / 100}
                     className="text-blue-500 transition-all duration-1000 ease-out" />
                 </svg>

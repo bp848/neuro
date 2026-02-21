@@ -9,9 +9,17 @@ import json
 from typing import Optional
 import audio_logic as dsp
 
+from supabase import create_client, Client
+
 app = FastAPI(title="Neuro-Master DSP Engine (Python)")
 
+# Initialize Supabase
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+supabase: Client = create_client(supabase_url, supabase_key) if supabase_url and supabase_key else None
+
 class MasteringRequest(BaseModel):
+    jobId: Optional[str] = None
     inputBucket: str
     inputPath: str
     outputBucket: str
@@ -124,6 +132,12 @@ async def process_audio_internal(request: MasteringRequest):
         os.remove(local_input)
         os.remove(local_output)
         
+        if request.jobId and supabase:
+            supabase.table("mastering_jobs").update({
+                "status": "completed",
+                "output_path": f"gs://{request.outputBucket}/{request.outputPath}"
+            }).eq("id", request.jobId).execute()
+
         return {
             "status": "success",
             "outputPath": f"gs://{request.outputBucket}/{request.outputPath}",
