@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Mastering SaaS — 新アーキテクチャ設計</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600;700&family=Bebas+Neue&family=IBM+Plex+Sans+JP:wght@300;400;600&display=swap');
+
+  :root {
+    --bg: #03050a;
+    --surface: #080d14;
+    --card: #0c1220;
+    --border: #162030;
+    --border2: #1e3050;
+    --text: #b8c8d8;
+    --muted: #3d5570;
+    --accent: #00e5ff;
+    --gemini: #4285f4;
+    --claude: #d97706;
+    --gpt: #10b981;
+    --gcs: #a855f7;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --ok: #22d3a8;
+    --white: #e8f0f8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    padding: 40px 36px 80px;
+  }
+
+  /* HEADER */
+  .header {
+    margin-bottom: 48px;
+  }
+  .header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 42px;
+    letter-spacing: 3px;
+    color: var(--white);
+    line-height: 1;
+  }
+  .header .sub {
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 6px;
+    letter-spacing: 1px;
+  }
+  .header .tagline {
+    margin-top: 12px;
+    font-family: 'IBM Plex Sans JP', sans-serif;
+    font-size: 13px;
+    color: var(--accent);
+  }
+
+  /* SECTION TITLE */
+  .sec-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    margin-top: 48px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+  }
+
+  /* ─── PIPELINE ─── */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .pipe-row {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: 0 20px;
+    position: relative;
+  }
+
+  .pipe-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .pipe-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 18px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .pipe-connector {
+    width: 1px;
+    flex: 1;
+    min-height: 12px;
+  }
+
+  .pipe-body {
+    padding: 14px 0 20px 0;
+  }
+
+  /* STAGE CARD */
+  .stage {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 2px;
+  }
+
+  .stage-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .stage-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    color: var(--muted);
+    line-height: 1;
+    min-width: 24px;
+  }
+
+  .stage-title {
+    font-family: 'IBM Plex Sans JP', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--white);
+  }
+
+  .badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .badge.gemini  { background: #0d1f4a; color: var(--gemini); }
+  .badge.claude  { background: #2d1a00; color: var(--claude); }
+  .badge.gpt     { background: #052e1c; color: var(--gpt); }
+  .badge.gcs     { background: #1a0d2e; color: var(--gcs); }
+  .badge.dsp     { background: #0d1f33; color: var(--accent); }
+  .badge.mail    { background: #1a1a00; color: var(--warn); }
+  .badge.player  { background: #1a0d0d; color: var(--danger); }
+  .badge.multi   { background: #0d2020; color: var(--ok); }
+
+  .stage-desc {
+    font-family: 'IBM Plex Sans JP', sans-serif;
+    font-size: 12px;
+    color: var(--text);
+    margin-bottom: 12px;
+    line-height: 1.7;
+  }
+
+  /* DETAIL GRID */
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+  }
+
+  .detail-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px 12px;
+  }
+
+  .detail-label {
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .detail-value {
+    font-size: 11px;
+    color: var(--text);
+  }
+
+  .detail-value code {
+    background: #050810;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--accent);
+    font-size: 10px;
+  }
+
+  /* AGENT TRIO */
+  .agent-trio {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .agent-card {
+    border-radius: 6px;
+    padding: 12px 14px;
+    border: 1px solid;
+  }
+
+  .agent-card.gemini { background: #050f1e; border-color: #162a5a; }
+  .agent-card.claude { background: #1a1000; border-color: #3d2a00; }
+  .agent-card.gpt    { background: #031a0e; border-color: #0d3d1e; }
+
+  .agent-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+
+  .agent-name.gemini { color: var(--gemini); }
+  .agent-name.claude { color: var(--claude); }
+  .agent-name.gpt    { color: var(--gpt); }
+
+  .agent-role {
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .agent-tools {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .agent-tools li {
+    font-size: 10px;
+    color: var(--text);
+    padding-left: 10px;
+    position: relative;
+  }
+
+  .agent-tools li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-size: 9px;
+  }
+
+  /* FUNCTION CALLS */
+  .fn-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .fn-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px 14px;
+  }
+
+  .fn-name {
+    font-size: 11px;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .fn-desc {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .fn-caller {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+
+  .fn-caller.gemini { background: #0d1f4a; color: var(--gemini); }
+  .fn-caller.claude { background: #2d1a00; color: var(--claude); }
+  .fn-caller.gpt    { background: #052e1c; color: var(--gpt); }
+  .fn-caller.all    { background: #0d2020; color: var(--ok); }
+
+  /* GCS LAYOUT */
+  .gcs-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .gcs-bucket {
+    background: var(--surface);
+    border: 1px solid #2a1550;
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+
+  .gcs-bucket-name {
+    font-size: 10px;
+    color: var(--gcs);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  .gcs-bucket-path {
+    font-size: 9px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .gcs-files {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .gcs-files li {
+    font-size: 9px;
+    color: var(--text);
+    padding-left: 10px;
+    position: relative;
+  }
+
+  .gcs-files li::before {
+    content: '📄';
+    position: absolute;
+    left: 0;
+    font-size: 8px;
+  }
+
+  /* PLAYER PROTECTION */
+  .protect-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .protect-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px 12px;
+  }
+
+  .protect-label {
+    font-size: 10px;
+    color: var(--danger);
+    margin-bottom: 4px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  .protect-value {
+    font-size: 11px;
+    color: var(--text);
+  }
+
+  /* ISSUE CALLOUT */
+  .callout {
+    margin-top: 8px;
+    background: #1a0a00;
+    border: 1px solid #3d2000;
+    border-radius: 5px;
+    padding: 10px 14px;
+    font-size: 11px;
+    color: #f59e0b;
+  }
+
+  .callout strong { color: #fbbf24; }
+
+  /* CONNECTOR ARROW */
+  .arrow-connector {
+    text-align: center;
+    padding: 4px 0;
+    color: var(--border2);
+    font-size: 18px;
+    padding-left: 52px;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>AI Mastering SaaS</h1>
+  <div class="sub">NEW ARCHITECTURE — GCS + MULTI-AGENT + FUNCTION CALLING</div>
+  <div class="tagline">Gemini で分析 → 3 AI 合議で最適パラメータ → DSP 処理 → 保護プレイヤー配信</div>
+</div>
+
+
+<!-- ════════════════════════════════════
+     STAGE 1 — UPLOAD
+════════════════════════════════════ -->
+<div class="sec-title">PIPELINE</div>
+
+<div class="pipeline">
+
+<div class="stage" style="border-left: 3px solid var(--gcs)">
+  <div class="stage-header">
+    <span class="stage-num">01</span>
+    <span class="stage-title">音源アップロード → GCS 保存</span>
+    <span class="badge gcs">GCS</span>
+  </div>
+  <div class="stage-desc">
+    ユーザーがブラウザから WAV / AIFF をアップロード。署名付き URL で GCS に直接PUT。
+    バックエンドを経由しないため高速かつ帯域コスト最小。
+  </div>
+  <div class="detail-grid">
+    <div class="detail-item">
+      <div class="detail-label">保存先バケット</div>
+      <div class="detail-value"><code>gs://mastering-raw/{userId}/{jobId}/input.wav</code></div>
+    </div>
+    <div class="detail-item">
+      <div class="detail-label">フォーマット要件</div>
+      <div class="detail-value">WAV / AIFF / FLAC — 最大 24bit/96kHz</div>
+    </div>
+    <div class="detail-item">
+      <div class="detail-label">アップロード方式</div>
+      <div class="detail-value">GCS Signed URL (PUT, 15分有効)</div>
+    </div>
+    <div class="detail-item">
+      <div class="detail-label">完了通知</div>
+      <div class="detail-value">GCS Pub/Sub → Cloud Run でジョブ起動</div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-connector">↓</div>
+
+<!-- STAGE 2 — GEMINI ANALYSIS -->
+<div class="stage" style="border-left: 3px solid var(--gemini)">
+  <div class="stage-header">
+    <span class="stage-num">02</span>
+    <span class="stage-title">Gemini による音響分析（33項目）</span>
+    <span class="badge gemini">GEMINI</span>
+  </div>
+  <div class="stage-desc">
+    Gemini が GCS の音源を直接参照し、55項目のうち分析系33項目を算出。
+    Function Calling で構造化 JSON として返却。ランダム要素なし・決定論的。
+  </div>
+  <div class="agent-trio" style="grid-template-columns: 1fr;">
+    <div class="agent-card gemini">
+      <div class="agent-name gemini">Gemini 2.0 Flash</div>
+      <div class="agent-role">音響特徴量エクストラクター</div>
+      <ul class="agent-tools">
+        <li>LUFS / LRA / True Peak / Crest Factor (BS.1770準拠 K重みあり)</li>
+        <li>セクション検出 (intro/verse/build/drop/break/chorus/outro) + energyLevel</li>
+        <li>周波数帯域エネルギー (6band) / ステレオ幅 / 位相相関</li>
+        <li>歪み率 / ノイズフロア / クリッピングリスク予測</li>
+        <li>結果を <code>gs://mastering-analysis/{jobId}/analysis.json</code> に保存</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-connector">↓</div>
+
+<!-- STAGE 3 — 3AI COUNCIL -->
+<div class="stage" style="border-left: 3px solid var(--ok)">
+  <div class="stage-header">
+    <span class="stage-num">03</span>
+    <span class="stage-title">3 AI 合議 — Beatport Top10 基準でパラメータ決定</span>
+    <span class="badge multi">MULTI-AGENT</span>
+  </div>
+  <div class="stage-desc">
+    analysis.json を3つの AIに並列で渡す。各 AI が独自の視点で MasteringParams の最適値を Function Calling で返却。
+    Orchestrator（Claude）が投票ロジックで最終パラメータを確定。
+  </div>
+  <div class="agent-trio">
+    <div class="agent-card gemini">
+      <div class="agent-name gemini">Gemini</div>
+      <div class="agent-role">Composer 視点（楽曲構造・グルーブ）</div>
+      <ul class="agent-tools">
+        <li>セクション別 tubeDrive 提案</li>
+        <li>ドロップのパンチ感最大化</li>
+        <li>低域輪郭 (Pultec 55Hz) 最適値</li>
+        <li>story / groove / character スコア</li>
+      </ul>
+    </div>
+    <div class="agent-card claude">
+      <div class="agent-name claude">Claude</div>
+      <div class="agent-role">Engineer 視点（安全性・位相・歪み）</div>
+      <ul class="agent-tools">
+        <li>limiter_ceiling / attack の最終決定</li>
+        <li>K重み LUFS ターゲット設定</li>
+        <li>distortion / clipping リスク評価</li>
+        <li>パラメータ整合性の最終承認</li>
+      </ul>
+    </div>
+    <div class="agent-card gpt">
+      <div class="agent-name gpt">ChatGPT</div>
+      <div class="agent-role">Audience 視点（リスナー体験・疲労感）</div>
+      <ul class="agent-tools">
+        <li>ラウドネス感 vs 疲労のバランス</li>
+        <li>high air (+4.5dB shelf) 量の調整</li>
+        <li>Neuro-Drive wetMix 提案</li>
+        <li>Beatport Top10 比較スコア</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout">
+    <strong>合議ルール（Orchestrator = Claude）：</strong>
+    3エージェントの各パラメータの中央値を基本採用。Engineer 視点が REJECT を出した場合はそのパラメータを強制的にエンジニア提案値に差し替え。全員 APPROVE で確定 → <code>params.json</code> を GCS に保存。
+  </div>
+</div>
+
+<div class="arrow-connector">↓</div>
+
+<!-- STAGE 4 — DSP -->
+<div class="stage" style="border-left: 3px solid var(--accent)">
+  <div class="stage-header">
+    <span class="stage-num">04</span>
+    <span class="stage-title">Dynamic Adaptive Mastering — DSP 処理</span>
+    <span class="badge dsp">DSP ENGINE</span>
+  </div>
+  <div class="stage-desc">
+    確定した params.json を受け取り、既存 audioService.ts の buildMasteringChain をセクション別に実行。
+    自己補正ループ（optimizeMasteringParams）で最終 LUFS 調整。
+  </div>
+  <div class="detail-grid">
+    <div class="detail-item">
+      <div class="detail-label">処理環境</div>
+      <div class="detail-value">Cloud Run (Node.js + Web Audio API ポリフィル / Wasm)</div>
+    </div>
+    <div class="detail-item">
+      <div class="detail-label">セクション別処理</div>
+      <div class="detail-value">intro/verse/drop 等で tubeDrive / neuroDriveMix を動的切替</div>
+    </div>
+    <div class="detail-item">
+      <div class="detail-label">LUFS ターゲット</div>
+      <div class="detail-value">Beatport: -8〜-6 LUFS / Spotify: -14 LUFS（プラン設定）</div>
+    </div>
+    <div class="detail-item">
+      <div class="detail-label">出力先</div>
+      <div class="detail-value"><code>gs://mastering-output/{jobId}/mastered.wav</code></div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-connector">↓</div>
+
+<!-- STAGE 5 — PROTECTION PLAYER -->
+<div class="stage" style="border-left: 3px solid var(--danger)">
+  <div class="stage-header">
+    <span class="stage-num">05</span>
+    <span class="stage-title">保護プレイヤー配信（MasteringVisualizer）</span>
+    <span class="badge player">PROTECTED</span>
+  </div>
+  <div class="stage-desc">
+    処理済みファイルは GCS の署名付き URL でのみストリーミング再生可能。
+    ダウンロード購入前はウォーターマーク版のみ。購入後に高音質ファイルの URL を発行。
+  </div>
+  <div class="protect-grid">
+    <div class="protect-item">
+      <div class="protect-label">🔒 再生方式</div>
+      <div class="protect-value">GCS 署名付き URL（15分TTL） → Web Audio API でストリーミング。src属性に直接 URL を渡さない。</div>
+    </div>
+    <div class="protect-item">
+      <div class="protect-label">🔒 ダウンロード防止</div>
+      <div class="protect-value">ArrayBuffer で取得後 AudioContext に渡す。&lt;audio&gt; タグ不使用。右クリック・devtools からの URL 取得を防止。</div>
+    </div>
+    <div class="protect-item">
+      <div class="protect-label">🔒 ウォーターマーク</div>
+      <div class="protect-value">プレビュー版は 20秒ごとに -12dB のビープを埋め込む（DSP処理時に生成）</div>
+    </div>
+    <div class="protect-item">
+      <div class="protect-label">💳 購入フロー</div>
+      <div class="protect-value">Stripe Checkout → 決済完了 Webhook → 24時間有効の署名付きダウンロード URL 発行</div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-connector">↓</div>
+
+<!-- STAGE 6 — EMAIL -->
+<div class="stage" style="border-left: 3px solid var(--warn)">
+  <div class="stage-header">
+    <span class="stage-num">06</span>
+    <span class="stage-title">完了通知メール + AI フィードバック</span>
+    <span class="badge mail">EMAIL</span>
+  </div>
+  <div class="stage-desc">
+    マスタリング完了後、Claude が分析結果と3AI合議スコアをもとに日本語の自然言語フィードバックを生成。
+    SendGrid でユーザーにメール送信。プレイヤーへのリンクと購入ボタンを含む。
+  </div>
+  <div class="detail-grid">
+    <div class="detail-item">
+      <div class="detail-label">メール内容</div>
+      <div class="detail-value">合議スコア / 主要改善点 / Beatport比較 / プレイヤーURL / 購入ボタン</div>
+    </div>
+    <div class="detail-item">
+      <div class="detail-label">送信サービス</div>
+      <div class="detail-value">SendGrid (Transactional)</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /pipeline -->
+
+
+<!-- ════════════════════════════════════
+     GCS STRUCTURE
+════════════════════════════════════ -->
+<div class="sec-title">GCS バケット構造</div>
+<div class="gcs-grid">
+  <div class="gcs-bucket">
+    <div class="gcs-bucket-name">mastering-raw</div>
+    <div class="gcs-bucket-path">gs://mastering-raw/{userId}/{jobId}/</div>
+    <ul class="gcs-files">
+      <li>input.wav — オリジナル原盤（変更不可）</li>
+      <li>metadata.json — アップロード時情報</li>
+    </ul>
+  </div>
+  <div class="gcs-bucket">
+    <div class="gcs-bucket-name">mastering-analysis</div>
+    <div class="gcs-bucket-path">gs://mastering-analysis/{jobId}/</div>
+    <ul class="gcs-files">
+      <li>analysis.json — Gemini 33項目出力</li>
+      <li>params.json — 3AI合議確定パラメータ</li>
+      <li>consensus.json — 各AIスコア詳細</li>
+      <li>sections.json — セクション検出結果</li>
+    </ul>
+  </div>
+  <div class="gcs-bucket">
+    <div class="gcs-bucket-name">mastering-output</div>
+    <div class="gcs-bucket-path">gs://mastering-output/{jobId}/</div>
+    <ul class="gcs-files">
+      <li>mastered.wav — 完成品（24bit/44.1kHz）</li>
+      <li>preview_wm.wav — ウォーターマーク版</li>
+      <li>report.json — MQI・最終スコア</li>
+    </ul>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════
+     FUNCTION CALLS
+════════════════════════════════════ -->
+<div class="sec-title">Function Calls 一覧</div>
+<div class="fn-list">
+  <div class="fn-item">
+    <div class="fn-name">analyze_audio_full</div>
+    <div class="fn-desc">GCS URI から音源を読み込み、33項目の FullAnalysis を返す。K重みLUFS必須。</div>
+    <div class="fn-caller gemini">Gemini</div>
+  </div>
+  <div class="fn-item">
+    <div class="fn-name">detect_sections</div>
+    <div class="fn-desc">エネルギー変化からセクション境界を検出。各セクションの type / energyLevel / rms を返す。</div>
+    <div class="fn-caller gemini">Gemini</div>
+  </div>
+  <div class="fn-item">
+    <div class="fn-name">propose_mastering_params</div>
+    <div class="fn-desc">FullAnalysis + SectionDetection[] → MasteringParams + SectionMasteringParams[] を提案。視点ごとに独立呼び出し。</div>
+    <div class="fn-caller all">全AI</div>
+  </div>
+  <div class="fn-item">
+    <div class="fn-name">run_consensus</div>
+    <div class="fn-desc">3エージェントの提案を受け取り、中央値ベースで最終パラメータを確定。REJECT時は強制上書き。</div>
+    <div class="fn-caller claude">Claude</div>
+  </div>
+  <div class="fn-item">
+    <div class="fn-name">score_beatport_compatibility</div>
+    <div class="fn-desc">最終パラメータと Beatport Top10 統計データを比較し、互換スコア (0-100) を返す。</div>
+    <div class="fn-caller gpt">ChatGPT</div>
+  </div>
+  <div class="fn-item">
+    <div class="fn-name">apply_mastering_chain</div>
+    <div class="fn-desc">確定 params.json と input.wav GCS URI を受け取り、DSP処理後に mastered.wav を GCS に書き込む。</div>
+    <div class="fn-caller claude">Claude</div>
+  </div>
+  <div class="fn-item">
+    <div class="fn-name">generate_feedback_report</div>
+    <div class="fn-desc">合議スコア + MQI + FullAnalysis から日本語フィードバックテキストを生成。メール本文に使用。</div>
+    <div class="fn-caller claude">Claude</div>
+  </div>
+  <div class="fn-item">
+    <div class="fn-name">issue_preview_url / issue_download_url</div>
+    <div class="fn-desc">GCS 署名付き URL を生成。preview は15分TTL+ウォーターマーク版。download は購入後24時間TTL。</div>
+    <div class="fn-caller claude">Claude</div>
+  </div>
+</div>
+
+</body>
+</html>
