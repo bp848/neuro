@@ -40,7 +40,7 @@ def make_tube_curve(drive_amount: float) -> np.ndarray:
     for i in range(TUBE_CURVE_LEN):
         x = (i / (TUBE_CURVE_LEN - 1)) * 2 - 1
         s = math.copysign(1.0, x) if x != 0 else 0.0
-        abs_x = abs(x)
+        abs_x = math.fabs(x)
         saturated = s * (1 - math.exp(-abs_x * drive))
         even_harmonic = saturated * (1 + 0.15 * math.cos(math.pi * abs_x))
         curve[i] = max(-1.0, min(1.0, even_harmonic))
@@ -368,4 +368,5 @@ EFFECTIVE_ENGINE_CONSTANTS = {
 def params_to_dict(params: MasteringParams) -> dict:
     """Helper to convert MasteringParams to a JSON-serializable dict."""
     import dataclasses
-    return dataclasses.asdict(params)
+    from typing import Any
+    return dataclasses.asdict(params) # type: ignore

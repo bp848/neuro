@@ -53,27 +53,47 @@ app.post('/trigger', async (req: any, res: any) => {
             await supabase.from('mastering_jobs').update({ status: 'analyzing' }).eq('id', jobId);
         }
 
-        const prompt = `
-      You are an AI mastering system designed to dominate the Beatport Top 10 (Tech House, Melodic Techno, Peak Time Techno).
-      Analyze the provided audio and reach a consensus through three specialized agent personas:
+        const audioFileData = { fileData: { fileUri: `gs://${bucket}/${name}`, mimeType: 'audio/wav' } };
+
+        // 1. Audience Persona Call
+        console.log('Consulting Audience Agent...');
+        const audiencePrompt = `
+      You are the **Audience Persona**. Focus on energy, impact, and "vibe". 
+      Analyze the track for festival/club playback. Does the kick hit hard enough? Is the bass clear?
+      Respond in JSON: {"comment": "...", "suggestedParams": {"tube_drive": 0.0-1.0, "low_contour": 0.0-2.5}}
+    `;
+        const audienceResult = await generativeModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: audiencePrompt }, audioFileData] }],
+            generationConfig: { responseMimeType: 'application/json' }
+        });
+        const audienceOpinion = JSON.parse(audienceResult.response.candidates?.[0].content.parts[0].text || '{}');
+
+        // 2. A&R Persona Call
+        console.log('Consulting A&R Agent...');
+        const arPrompt = `
+      You are the **A&R Persona**. Focus on market compatibility and Beatport Top 10 standards.
+      Audience's opinion: "${audienceOpinion.comment}"
+      Compare this track to labels like Afterlife or Drumcode.
+      Respond in JSON: {"comment": "...", "suggestedParams": {"tube_drive": 0.0-1.0, "target_lufs": -9.0 to -7.0}}
+    `;
+        const arResult = await generativeModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: arPrompt }, audioFileData] }],
+            generationConfig: { responseMimeType: 'application/json' }
+        });
+        const arOpinion = JSON.parse(arResult.response.candidates?.[0].content.parts[0].text || '{}');
+
+        // 3. Engineer Persona Call (Final Consensus)
+        console.log('Consulting Engineer Agent (Final Consensus)...');
+        const engineerPrompt = `
+      You are the **Mastering Engineer Persona**. Focus on technical integrity, phase, and dynamics.
+      Audience opinion: "${audienceOpinion.comment}"
+      A&R opinion: "${arOpinion.comment}"
+      Synthesize these into final DSP parameters. Ensure no clipping and optimal "expensive" sound.
       
-      1. **Audience Persona**: Focuses on energy, impact, and "vibe". Wants it loud and exciting. Prioritizes the "kick and bass" relationship for festival systems.
-      2. **A&R Persona**: Focuses on market compatibility and translation. Compares it to current Top 10 standards from labels like Afterlife, Drumcode, or Catch & Release.
-      3. **Engineer Persona**: Focuses on technical integrity, phase, and dynamic range. Ensures the high-end is "expensive" sounding and prevents inter-sample peaks.
-      
-      Provide:
-      - 20 technical metrics (name, value, target, unit, status: low/optimal/high, description).
-      - Discussion opinions for each persona.
-      - Final agreed-upon DSP parameters.
-      
-      Respond ONLY in JSON format:
+      Respond ONLY in JSON:
       {
-        "metrics": [...],
-        "opinions": [
-            {"role": "Audience", "comment": "...", "suggestedParams": {...}},
-            {"role": "A&R", "comment": "...", "suggestedParams": {...}},
-            {"role": "Engineer", "comment": "...", "suggestedParams": {...}}
-        ],
+        "metrics": [{"name": "...", "value": "...", "target": "...", "unit": "...", "status": "low/optimal/high", "description": "..."}],
+        "engineerComment": "...",
         "finalParams": {
             "tube_drive_amount": (0-1),
             "low_contour_amount": (0-2.5),
@@ -82,36 +102,27 @@ app.post('/trigger', async (req: any, res: any) => {
         }
       }
     `;
-
-        const audioFilePath = `gs://${bucket}/${name}`;
-        const result = await generativeModel.generateContent({
-            contents: [
-                {
-                    role: 'user',
-                    parts: [
-                        { text: prompt },
-                        { fileData: { fileUri: audioFilePath, mimeType: 'audio/wav' } }
-                    ]
-                }
-            ],
-            generationConfig: {
-                responseMimeType: 'application/json',
-            }
+        const engineerResult = await generativeModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: engineerPrompt }, audioFileData] }],
+            generationConfig: { responseMimeType: 'application/json' }
         });
+        const finalConsensus = JSON.parse(engineerResult.response.candidates?.[0].content.parts[0].text || '{}');
 
-        const aiResponseText = result.response.candidates?.[0].content.parts[0].text;
-        if (!aiResponseText) throw new Error('No response from Gemini');
+        const consensusOpinions = [
+            { role: 'Audience', comment: audienceOpinion.comment },
+            { role: 'A&R', comment: arOpinion.comment },
+            { role: 'Engineer', comment: finalConsensus.engineerComment }
+        ];
 
-        const analysisResult = JSON.parse(aiResponseText);
-        console.log('Gemini Analysis & Consensus achieved.');
+        console.log('Multi-Agent Consensus achieved.');
 
         // 3. Update Supabase
         if (jobId) {
             await supabase.from('mastering_jobs').update({
                 status: 'processing',
-                metrics: analysisResult.metrics,
-                consensus_opinions: analysisResult.opinions,
-                final_params: analysisResult.finalParams
+                metrics: finalConsensus.metrics,
+                consensus_opinions: consensusOpinions,
+                final_params: finalConsensus.finalParams
             }).eq('id', jobId);
         }
 
@@ -126,8 +137,8 @@ app.post('/trigger', async (req: any, res: any) => {
             inputPath: name,
             outputBucket: outputBucket,
             outputPath: outputPath,
-            params: analysisResult.finalParams,
-            targetLUFS: analysisResult.finalParams.target_lufs
+            params: finalConsensus.finalParams,
+            targetLUFS: finalConsensus.finalParams.target_lufs
         };
 
         const messageId = await pubsub.topic(topicName).publishMessage({
@@ -140,7 +151,7 @@ app.post('/trigger', async (req: any, res: any) => {
     } catch (error: any) {
         console.error('Error in analysis trigger:', error);
         if (jobId) {
-            await supabase.from('mastering_jobs').update({ status: 'failed' }).eq('id', jobId);
+            await supabase.from('mastering_jobs').update({ status: 'failed', error_message: error.message }).eq('id', jobId);
         }
         res.status(500).send(`Analysis failed: ${error.message || 'Unknown error'}`);
     }

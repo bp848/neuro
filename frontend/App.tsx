@@ -9,7 +9,8 @@ import { MasteringState, MasteringParams } from './types';
 import { Download, RefreshCw, CheckCircle2, Loader2, Waves } from 'lucide-react';
 import { supabase } from './services/supabaseClient';
 
-const App: React.FC = () => {
+// Use direct functional component definition to avoid FC type issues
+export default function App() {
   const [state, setState] = useState<MasteringState>({
     step: 'idle',
     progress: 0,
@@ -34,7 +35,7 @@ const App: React.FC = () => {
         const response = await fetch(url);
         const arrayBuffer = await response.arrayBuffer();
         const decoded = await audioContext.decodeAudioData(arrayBuffer);
-        setState(prev => ({ ...prev, masteredBuffer: decoded }));
+        setState((prev: MasteringState) => ({ ...prev, masteredBuffer: decoded }));
       } catch (e) {
         console.error("Failed to decode mastered audio:", e);
       }
@@ -51,7 +52,7 @@ const App: React.FC = () => {
 
           const publicUrl = job.output_path ? job.output_path.replace('gs://', 'https://storage.googleapis.com/') : null;
 
-          setState(prev => ({
+          setState((prev: MasteringState) => ({
             ...prev,
             step: job.status,
             analysis: job.metrics,
@@ -72,8 +73,8 @@ const App: React.FC = () => {
     return () => { channel.unsubscribe(); };
   }, [activeJobId, audioContext]);
 
-  const handleUpload = async (file: File) => {
-    setState(prev => ({ ...prev, step: 'uploading', progress: 5, fileName: file.name }));
+  const handleUpload = async (file: File, email: string) => {
+    setState((prev: MasteringState) => ({ ...prev, step: 'uploading', progress: 5, fileName: file.name }));
 
     try {
       // Decode locally for original player
@@ -83,7 +84,12 @@ const App: React.FC = () => {
       // 1. Create Job in Supabase
       const { data: job, error: jobErr } = await supabase
         .from('mastering_jobs')
-        .insert({ file_name: file.name, status: 'uploading', input_path: '' })
+        .insert({
+          file_name: file.name,
+          status: 'uploading',
+          input_path: '',
+          user_email: email
+        })
         .select()
         .single();
 
@@ -111,11 +117,11 @@ const App: React.FC = () => {
       // 4. Update job with the actual path
       await supabase.from('mastering_jobs').update({ input_path: path }).eq('id', job.id);
 
-      setState(prev => ({ ...prev, progress: 20 }));
+      setState((prev: MasteringState) => ({ ...prev, progress: 20 }));
 
     } catch (error) {
       console.error("Mastering failed:", error);
-      setState(prev => ({ ...prev, step: 'idle', progress: 0 }));
+      setState((prev: MasteringState) => ({ ...prev, step: 'idle', progress: 0 }));
     }
   };
 
@@ -250,6 +256,4 @@ const App: React.FC = () => {
       </footer>
     </div>
   );
-};
-
-export default App;
+}

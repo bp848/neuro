@@ -8,6 +8,7 @@ import time
 import json
 from typing import Optional
 import audio_logic as dsp
+import requests
 
 from supabase import create_client, Client
 
@@ -70,7 +71,17 @@ async def pubsub_trigger(request: dict):
 async def process_audio_internal(request: MasteringRequest):
     try:
         print(f"Processing {request.inputPath} from {request.inputBucket}...")
-        
+
+        # 0. Fetch job info for notification later
+        job_info = {}
+        if request.jobId and supabase:
+            try:
+                res = supabase.table("mastering_jobs").select("user_email, file_name").eq("id", request.jobId).execute()
+                if res.data:
+                    job_info = res.data[0]
+            except Exception as e:
+                print(f"Warning: Could not fetch job info: {str(e)}")
+
         # 1. Download from GCS
         local_input = f"/tmp/input_{int(time.time())}.wav"
         bucket = storage_client.bucket(request.inputBucket)
@@ -137,6 +148,21 @@ async def process_audio_internal(request: MasteringRequest):
                 "status": "completed",
                 "output_path": f"gs://{request.outputBucket}/{request.outputPath}"
             }).eq("id", request.jobId).execute()
+
+            # Trigger email notification via Vercel Function
+            user_email = job_info.get("user_email")
+            if user_email:
+                try:
+                    app_url = os.environ.get("NEXT_PUBLIC_APP_URL", "https://neuro-master-beatport-top-10-ai.vercel.app")
+                    notify_url = f"{app_url}/api/notify"
+                    print(f"Triggering notification for {user_email} at {notify_url}")
+                    requests.post(notify_url, json={
+                        "email": user_email,
+                        "jobId": request.jobId,
+                        "fileName": job_info.get("file_name", "your mastered track")
+                    }, timeout=5)
+                except Exception as e:
+                    print(f"Notification Trigger Failed: {str(e)}")
 
         return {
             "status": "success",

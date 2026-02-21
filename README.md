@@ -1,54 +1,62 @@
-# Vertex AI Studio Frontend App with Node.js Backend
+# Neuro-Master: AI-Driven Audio Mastering (Production-Ready)
 
-This repository contains a frontend and a Node.js backend, designed to run together.
-The backend acts as a proxy, handling Google Cloud API calls.
+Neuro-Master is a state-of-the-art AI audio mastering service that leverages a multi-agent neural consensus and a hybrid-analog DSP engine to deliver professional-grade masters aligned with the "Beatport Top 10" sonic standard.
 
-This project is intended for demonstration and prototyping purposes only.
-It is not intended for use in a production environment.
+## 🚀 Key Features
 
-## Prerequisites
+- **Multi-Agent Neural Consensus**: Spectral analysis handled by sequential AI agents (Audience, A&R, and Engineer) to negotiate the perfect parameters.
+- **Hybrid-Analog DSP Engine**: High-fidelity Python-based processing with iterative self-correction for target LUFS and Peak integrity.
+- **Real-time Synchronization**: Powered by Supabase for instant progress updates and job status tracking.
+- **Production Email Delivery**: Automated job completion notifications via Resend.
+- **Microservices Architecture**: Scalable, event-driven pipeline deployed on Google Cloud Platform.
 
-To run this application locally, you need:
+## 🏗️ Architecture
 
-*   **[Google Cloud SDK / gcloud CLI](https://cloud.google.com/sdk/docs/install)**: Follow the instructions to install the SDK.
+1.  **Frontend**: React (Vite) + Tailwind CSS + Lucide Icons.
+2.  **Analysis Trigger (Node.js)**: Google Cloud Run service that orchestrates the multi-agent Gemini analysis.
+3.  **DSP Engine (Python)**: Google Cloud Run service for high-performance audio processing (Numpy/Scipy).
+4.  **Database & Real-time**: Supabase Postgres + Real-time subscriptions.
+5.  **Storage**: Google Cloud Storage (GCS) with event triggers.
+6.  **Email**: Resend API via Vercel Serverless Functions.
 
-*   **gcloud Initialization**:
-    *   Initialize the gcloud CLI:
-        ```bash
-        gcloud init
-        ```
-    *   Authenticate for Application Default Credentials (needed to call Google Cloud APIs):
-        ```bash
-        gcloud auth application-default login
-        ```
+## 🛠️ Prerequisites
 
-*   **Node.js and npm**: Ensure you have Node.js and its package manager, `npm`, installed on your machine.
+- **Google Cloud SDK**: Authenticated and configured with a project.
+- **Node.js 20+** & **Python 3.10+**.
+- **Supabase Account**: With a `mastering_jobs` table.
+- **Resend API Key**: For email notifications.
 
-## Project Structure
+## 🚦 Getting Started
 
-The project is organized into two main directories:
+### 1. Environment Variables
 
-*   `frontend/`: Contains the Frontend application code.
-*   `backend/`: Contains the Node.js/Express server code to proxy Google Cloud API calls.
+Create `.env` files in `frontend/`, `backend/audio-analysis-trigger/`, and `backend/dsp-mastering-engine/`.
 
-## Backend Environment Variables
+**Frontend (`frontend/.env`):**
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-The `backend/.env.local` file is automatically generated when you download this application.
-It contains essential Google Cloud environment variables pre-configured based on your project settings at the time of download.
+**Backend (Cloud Run Secrets):**
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GOOGLE_CLOUD_PROJECT`
+- `INPUT_BUCKET`
+- `OUTPUT_BUCKET`
 
-The variables set in `backend/.env.local` are:
-*   `API_BACKEND_PORT`: The port the backend API server listens on (e.g., `5000`).
-*   `API_PAYLOAD_MAX_SIZE`: The maximum size of the request payload accepted by the backend server (e.g., `5mb`).
-*   `GOOGLE_CLOUD_LOCATION`: The Google Cloud region associated with your project.
-*   `GOOGLE_CLOUD_PROJECT`: Your Google Cloud Project ID.
+### 2. Local Development
 
-**Note:** These variables are automatically populated during the download process.
-You can modify the values in `backend/.env.local` if you need to change them.
-
-## Installation and Running the App
-
-To install dependencies and run your Google Cloud Vertex AI Studio App locally, execute the following command:
-
+From the root directory:
 ```bash
-npm install && npm run dev
-# aidriven-master
+npm install
+npm run dev
+```
+
+This will concurrently start the frontend and the analysis trigger service.
+
+## 📝 License
+
+© 2025 NEURO-MASTER. All rights reserved. Professional use only.

@@ -3,15 +3,18 @@ import React from 'react';
 import { Upload, FileAudio, Zap, Layers } from 'lucide-react';
 
 interface Props {
-  onUpload: (file: File) => void;
+  onUpload: (file: File, email: string) => void;
   isUploading: boolean;
   fileName: string | null;
 }
 
 export const FileUploader: React.FC<Props> = ({ onUpload, isUploading, fileName }) => {
+  const [email, setEmail] = React.useState('');
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) onUpload(file);
+    if (file && email) onUpload(file, email);
+    else if (file && !email) alert("Please enter your email first to receive the notification.");
   };
 
   return (
@@ -22,7 +25,7 @@ export const FileUploader: React.FC<Props> = ({ onUpload, isUploading, fileName 
         ${fileName ? 'bg-blue-500/5 border-2 border-blue-500/30' : 'bg-white/[0.02] border-2 border-dashed border-white/10 hover:border-blue-500/40 hover:bg-white/[0.04]'}
       `}>
         <input type="file" className="hidden" accept="audio/*" onChange={handleFileChange} disabled={isUploading} />
-        
+
         {/* Background Decorative Elements */}
         <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity">
           <div className="absolute top-0 left-0 w-32 h-32 bg-blue-500 blur-[100px]"></div>
@@ -51,9 +54,19 @@ export const FileUploader: React.FC<Props> = ({ onUpload, isUploading, fileName 
                 <Upload className="w-12 h-12 text-gray-400 group-hover:text-blue-400 transition-colors" />
               </div>
               <h3 className="text-2xl font-bold text-white mb-2 tracking-tight">Initialize Mastering Sequence</h3>
-              <p className="text-gray-500 max-w-xs mx-auto text-sm leading-relaxed">
+              <p className="text-gray-500 max-w-xs mx-auto text-sm leading-relaxed mb-6">
                 Drop your high-fidelity pre-master (WAV/AIFF) to begin the AI-driven optimization process.
               </p>
+
+              <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm">
+                <input
+                  type="email"
+                  placeholder="Enter email for notification..."
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:border-blue-500/50 outline-none transition-all"
+                />
+              </div>
             </>
           )}
         </div>
