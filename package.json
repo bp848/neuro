@@ -1,6 +1,9 @@
 {
-  "name": "neuro-master:-beatport-top-10-ai",
-  "workspaces": ["frontend", "backend"], 
+  "name": "neuro-master-beatport-top-10-ai",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "scripts": {
     "dev-frontend": "npm run dev --prefix frontend",
     "dev-backend": "npm run dev --prefix backend",
