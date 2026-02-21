@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Header } from './components/Header';
-import { FileUploader } from './components/FileUploader';
+import { MasteringFlow } from './components/MasteringFlow';
 import { AnalysisView } from './components/AnalysisView';
 import { AgentConsensus } from './components/AgentConsensus';
 import { AudioComparisonPlayer } from './components/AudioComparisonPlayer';
@@ -139,6 +139,8 @@ export default function App() {
     });
   };
 
+  const isProcessing = state.step !== 'idle' && state.step !== 'completed';
+
   return (
     <div className="min-h-screen pb-32 pt-24">
       <Header />
@@ -152,13 +154,15 @@ export default function App() {
               </div>
               <h2 className="text-6xl md:text-8xl font-black tracking-tighter leading-none text-white">
                 MASTERING <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-500 to-purple-600 glow-text">REDEFINED.</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-500 to-purple-600 glow-text uppercase">Redefined.</span>
               </h2>
               <p className="text-lg text-gray-400 max-w-2xl mx-auto font-light leading-relaxed">
-                Upload your pre-master and let our neural agents negotiate the perfect DSP parameters to dominate the Beatport Top 10.
+                Experience the world's first multi-agent AI mastering service.
+                Our neural network negotiates the perfect tonal balance for your music.
               </p>
             </div>
-            <FileUploader onUpload={handleUpload} isUploading={false} fileName={null} />
+
+            <MasteringFlow onComplete={handleUpload} isProcessing={isProcessing} />
           </div>
         )}
 
