@@ -1,0 +1,9 @@
+{
+    "include": [
+        "."
+    ],
+    "extraPaths": [
+        "C:/Users/ishij/AppData/Roaming/Python/Python314/site-packages"
+    ],
+    "reportMissingImports": "none"
+}

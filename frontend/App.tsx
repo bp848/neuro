@@ -5,7 +5,7 @@ import { MasteringFlow } from './components/MasteringFlow';
 import { AnalysisView } from './components/AnalysisView';
 import { AgentConsensus } from './components/AgentConsensus';
 import { AudioComparisonPlayer } from './components/AudioComparisonPlayer';
-import { MasteringState, MasteringParams } from './types';
+import { MasteringState } from './types';
 import { Download, RefreshCw, CheckCircle2, Loader2, Waves } from 'lucide-react';
 import { supabase } from './services/supabaseClient';
 

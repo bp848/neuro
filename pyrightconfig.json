@@ -1,0 +1,8 @@
+{
+    "extraPaths": [
+        "c:/Users/ishij/OneDrive/Documents/GitHub/neuro-master_-beatport-top-10-ai/.venv/Lib/site-packages",
+        "./backend/dsp-mastering-engine"
+    ],
+    "typeCheckingMode": "basic",
+    "reportMissingImports": "none"
+}
