@@ -23,7 +23,7 @@ export interface AgentOpinion {
 }
 
 export interface MasteringState {
-  step: 'idle' | 'uploading' | 'analyzing' | 'consensus' | 'processing' | 'completed';
+  step: 'idle' | 'uploading' | 'analyzing' | 'consensus' | 'processing' | 'completed' | 'failed';
   progress: number;
   fileName: string | null;
   analysis: AnalysisMetric[] | null;
@@ -32,4 +32,5 @@ export interface MasteringState {
   outputUrl: string | null;
   originalBuffer: AudioBuffer | null;
   masteredBuffer: AudioBuffer | null;
+  error?: string | null;
 }

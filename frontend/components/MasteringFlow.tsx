@@ -1,34 +1,34 @@
 
 import React, { useState } from 'react';
-import { Mail, Upload, Play, ChevronRight, Music, AlertCircle, Loader2 } from 'lucide-react';
+import { Mail, Upload, Play, ChevronRight, Music, AlertCircle } from 'lucide-react';
 
 interface Props {
-    onComplete: (file: File, email: string) => void;
-    isProcessing: boolean;
+    onUpload: (file: File, email: string) => void;
 }
 
 type FlowStep = 'email' | 'upload' | 'confirm';
 
-export const MasteringFlow: React.FC<Props> = ({ onComplete, isProcessing }) => {
-    const [step, setStep] = useState<FlowStep>('email');
+export const MasteringFlow: React.FC<Props> = ({ onUpload }) => {
+    const [step, setStep] = useState<FlowStep>('upload');
     const [email, setEmail] = useState('');
     const [file, setFile] = useState<File | null>(null);
 
     const handleNext = () => {
-        if (step === 'email' && email) setStep('upload');
-        else if (step === 'upload' && file) setStep('confirm');
+        if (step === 'email' && email) setStep('confirm');
+        else if (step === 'upload' && file) setStep('email');
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
         if (selectedFile) {
             setFile(selectedFile);
+            setStep('email');
         }
     };
 
     const initiateMastering = () => {
         if (file && email) {
-            onComplete(file, email);
+            onUpload(file, email);
         }
     };
 
@@ -165,23 +165,15 @@ export const MasteringFlow: React.FC<Props> = ({ onComplete, isProcessing }) => 
                         <div className="flex gap-4">
                             <button
                                 onClick={() => setStep('upload')}
-                                disabled={isProcessing}
                                 className="flex-1 py-5 glass hover:bg-white/5 text-white font-bold rounded-2xl transition-all text-sm uppercase"
                             >
                                 Modify
                             </button>
                             <button
                                 onClick={initiateMastering}
-                                disabled={isProcessing}
                                 className="flex-[2] relative overflow-hidden py-5 bg-gradient-to-r from-blue-600 to-blue-400 hover:scale-[1.02] active:scale-95 text-white font-black rounded-2xl transition-all text-sm uppercase tracking-widest neon-glow shadow-blue-500/20"
                             >
-                                {isProcessing ? (
-                                    <div className="flex items-center justify-center gap-3">
-                                        <Loader2 className="w-5 h-5 animate-spin" /> RUNNING MATRIX...
-                                    </div>
-                                ) : (
-                                    'INITIATE NEURAL MASTERING'
-                                )}
+                                INITIATE NEURAL MASTERING
                             </button>
                         </div>
                     </div>

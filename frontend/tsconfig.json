@@ -32,13 +32,8 @@
         }
     },
     "include": [
-        "src",
-        "api",
-        "components",
-        "types.ts",
-        "App.tsx",
-        "index.tsx",
-        "services"
+        "**/*.ts",
+        "**/*.tsx"
     ],
     "references": [
         {

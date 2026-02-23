@@ -2,37 +2,46 @@
 import React from 'react';
 import { Cpu, Activity, ShieldCheck, Globe } from 'lucide-react';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  page: 'master' | 'algorithm';
+  onNav: (page: 'master' | 'algorithm') => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ page, onNav }) => {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/5 px-8 py-4 flex items-center justify-between">
-      <div className="flex items-center gap-4">
-        <div className="relative">
-          <div className="absolute -inset-1 bg-blue-500 rounded-lg blur opacity-25 animate-pulse"></div>
-          <div className="relative p-2 bg-black rounded-lg border border-blue-500/50">
-            <Cpu className="w-6 h-6 text-blue-400" />
+    <header className="h-14 border-b border-white/5 px-6 flex items-center justify-between glass z-50">
+      <div className="flex items-center gap-8">
+        <div className="flex items-center gap-3">
+          <div className="w-6 h-6 bg-white rounded-sm flex items-center justify-center">
+            <Cpu className="w-4 h-4 text-black" />
           </div>
+          <span className="text-sm font-bold tracking-tighter uppercase">Neuro-Master</span>
         </div>
-        <div>
-          <h1 className="text-lg font-extrabold tracking-[0.2em] text-white flex items-center gap-2">
-            NEURO<span className="text-blue-400">MASTER</span>
-            <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded border border-blue-500/30 font-mono">v2.5</span>
-          </h1>
-          <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono">Hybrid-Analog DSP // GCS Integrated</p>
-        </div>
+
+        <nav className="flex items-center gap-6">
+          <button
+            onClick={() => onNav('master')}
+            className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${page === 'master' ? 'text-white' : 'text-[#444] hover:text-[#888]'}`}
+          >
+            Master
+          </button>
+          <button
+            onClick={() => onNav('algorithm')}
+            className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${page === 'algorithm' ? 'text-white' : 'text-[#444] hover:text-[#888]'}`}
+          >
+            Algorithm
+          </button>
+        </nav>
       </div>
 
-      <div className="hidden md:flex items-center gap-8">
+      <div className="flex items-center gap-6">
         <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-green-500" />
-          <span className="text-[10px] font-mono text-gray-400 uppercase">Engine: Online</span>
+          <Activity className="w-3 h-3 text-green-500" />
+          <span className="text-[10px] font-mono text-[#444] uppercase tracking-widest">Engine: v6.0</span>
         </div>
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-blue-500" />
-          <span className="text-[10px] font-mono text-gray-400 uppercase">Auth: Verified</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Globe className="w-4 h-4 text-purple-500" />
-          <span className="text-[10px] font-mono text-gray-400 uppercase">Region: Global-Edge</span>
+        <div className="w-px h-3 bg-white/5" />
+        <div className="text-[10px] font-mono text-[#444] uppercase tracking-widest">
+          Auth: {page.toUpperCase()}
         </div>
       </div>
     </header>

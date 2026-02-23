@@ -1,16 +1,18 @@
-
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { MasteringFlow } from './components/MasteringFlow';
 import { AnalysisView } from './components/AnalysisView';
 import { AgentConsensus } from './components/AgentConsensus';
 import { AudioComparisonPlayer } from './components/AudioComparisonPlayer';
+import { AlgorithmView } from './components/AlgorithmView';
 import { MasteringState } from './types';
-import { Download, RefreshCw, CheckCircle2, Loader2, Waves } from 'lucide-react';
+import { Loader2, CheckCircle2, RefreshCw, CreditCard } from 'lucide-react';
 import { supabase } from './services/supabaseClient';
 
-// Use direct functional component definition to avoid FC type issues
+const SUPABASE_FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL + '/functions/v1';
+
 export default function App() {
+  const [page, setPage] = useState<'master' | 'algorithm'>('master');
   const [state, setState] = useState<MasteringState>({
     step: 'idle',
     progress: 0,
@@ -26,33 +28,21 @@ export default function App() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [audioContext] = useState(() => new (window.AudioContext || (window as any).webkitAudioContext)());
 
-  // Subscribe to real-time updates for the active job
-  React.useEffect(() => {
+  useEffect(() => {
     if (!activeJobId) return;
-
-    const fetchAndDecodeMaster = async (url: string) => {
-      try {
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
-        const decoded = await audioContext.decodeAudioData(arrayBuffer);
-        setState((prev: MasteringState) => ({ ...prev, masteredBuffer: decoded }));
-      } catch (e) {
-        console.error("Failed to decode mastered audio:", e);
-      }
-    };
 
     const channel = supabase
       .channel(`job-${activeJobId}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'mastering_jobs', filter: `id=eq.${activeJobId}` },
-        (payload) => {
+        async (payload) => {
           const job = payload.new;
-          console.log('Job Update:', job);
+          console.log('Realtime Update:', job.status, job);
 
-          const publicUrl = job.output_path ? job.output_path.replace('gs://', 'https://storage.googleapis.com/') : null;
+          const publicUrl = job.output_url;
 
-          setState((prev: MasteringState) => ({
+          setState((prev) => ({
             ...prev,
             step: job.status,
             analysis: job.metrics,
@@ -63,8 +53,15 @@ export default function App() {
           }));
 
           if (job.status === 'completed' && publicUrl) {
-            fetchAndDecodeMaster(publicUrl);
-            channel.unsubscribe();
+            try {
+              const res = await fetch(publicUrl);
+              const buf = await res.arrayBuffer();
+              const decoded = await audioContext.decodeAudioData(buf);
+              setState(prev => ({ ...prev, masteredBuffer: decoded }));
+              channel.unsubscribe();
+            } catch (e) {
+              console.error("Audio Load Error:", e);
+            }
           }
         }
       )
@@ -74,58 +71,45 @@ export default function App() {
   }, [activeJobId, audioContext]);
 
   const handleUpload = async (file: File, email: string) => {
-    setState((prev: MasteringState) => ({ ...prev, step: 'uploading', progress: 5, fileName: file.name }));
-
+    setState(prev => ({ ...prev, step: 'uploading', progress: 5, fileName: file.name }));
     try {
-      // Decode locally for original player
-      const arrayBuffer = await file.arrayBuffer();
-      const originalBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      setState(prev => ({ ...prev, originalBuffer }));
-      // 1. Create Job in Supabase
-      const { data: job, error: jobErr } = await supabase
-        .from('mastering_jobs')
-        .insert({
-          file_name: file.name,
-          status: 'uploading',
-          input_path: '',
-          user_email: email
-        })
-        .select()
-        .single();
-
-      if (jobErr) throw jobErr;
-      setActiveJobId(job.id);
-
-      // 2. Get Signed URL for GCS upload
-      const response = await fetch('/api/upload', {
+      // 1. Get Signed URL
+      const urlRes = await fetch(`${SUPABASE_FUNCTIONS_URL}/get-upload-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: file.name, contentType: file.type, jobId: job.id }),
+        body: JSON.stringify({ fileName: file.name, fileSize: file.size, userEmail: email }),
       });
-      const { url, path } = await response.json();
+      const data = await urlRes.json();
+      if (!urlRes.ok) throw new Error(data.error || 'Failed to get upload URL');
+      const { jobId, uploadUrl } = data;
+      setActiveJobId(jobId);
 
-      // 3. Upload directly to GCS
-      await fetch(url, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type,
-          'x-goog-meta-jobId': job.id
-        },
-        body: file,
+      // 2. Local Decode (Parallel)
+      file.arrayBuffer().then(b => audioContext.decodeAudioData(b)).then(buf => {
+        setState(prev => ({ ...prev, originalBuffer: buf }));
       });
 
-      // 4. Update job with the actual path
-      await supabase.from('mastering_jobs').update({ input_path: path }).eq('id', job.id);
+      // 3. Upload
+      const uploadRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+      if (!uploadRes.ok) throw new Error('Upload failed');
+      setState(prev => ({ ...prev, progress: 30 }));
 
-      setState((prev: MasteringState) => ({ ...prev, progress: 20 }));
+      // 4. Process
+      fetch(`${SUPABASE_FUNCTIONS_URL}/process-mastering`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId }),
+      }).catch(e => console.error(e));
 
-    } catch (error) {
-      console.error("Mastering failed:", error);
-      setState((prev: MasteringState) => ({ ...prev, step: 'idle', progress: 0 }));
+      setState(prev => ({ ...prev, step: 'analyzing', progress: 35 }));
+    } catch (error: any) {
+      console.error(error);
+      setState(prev => ({ ...prev, step: 'failed', progress: 0, error: error.message }));
     }
   };
 
   const reset = () => {
+    setActiveJobId(null);
     setState({
       step: 'idle',
       progress: 0,
@@ -136,126 +120,105 @@ export default function App() {
       outputUrl: null,
       originalBuffer: null,
       masteredBuffer: null,
+      error: null
     });
   };
 
-  const isProcessing = state.step !== 'idle' && state.step !== 'completed';
+  if (page === 'algorithm') return <AlgorithmView onNav={setPage} />;
 
   return (
-    <div className="min-h-screen pb-32 pt-24">
-      <Header />
+    <div className="h-screen flex flex-col surface-0 text-white selection:bg-[#444] dot-grid">
+      <Header page={page} onNav={setPage} />
 
-      <main className="max-w-7xl mx-auto px-8">
+      <main className="flex-1 overflow-hidden flex flex-col">
         {state.step === 'idle' && (
-          <div className="flex flex-col items-center justify-center min-h-[70vh] text-center space-y-12">
-            <div className="space-y-6 max-w-4xl">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass border-blue-500/20 text-blue-400 text-[10px] font-mono uppercase tracking-[0.3em] mb-4">
-                <Waves className="w-3 h-3" /> Next-Gen Audio Intelligence
-              </div>
-              <h2 className="text-6xl md:text-8xl font-black tracking-tighter leading-none text-white">
-                MASTERING <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-500 to-purple-600 glow-text uppercase">Redefined.</span>
-              </h2>
-              <p className="text-lg text-gray-400 max-w-2xl mx-auto font-light leading-relaxed">
-                Experience the world's first multi-agent AI mastering service.
-                Our neural network negotiates the perfect tonal balance for your music.
-              </p>
-            </div>
-
-            <MasteringFlow onComplete={handleUpload} isProcessing={isProcessing} />
+          <div className="flex-1 flex items-center justify-center p-6">
+            <MasteringFlow onUpload={handleUpload} />
           </div>
         )}
 
-        {(state.step !== 'idle' && state.step !== 'completed') && (
-          <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-12">
-            <div className="relative">
-              <div className="absolute -inset-10 bg-blue-500/10 rounded-full blur-[100px] animate-pulse"></div>
-              <div className="relative w-48 h-48 flex items-center justify-center">
-                <svg className="w-full h-full -rotate-90">
-                  <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-white/5" />
-                  <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="4" fill="transparent"
-                    strokeDasharray={552} strokeDashoffset={552 - (552 * state.progress) / 100}
-                    className="text-blue-500 transition-all duration-1000 ease-out" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <Loader2 className="w-10 h-10 text-blue-400 animate-spin mb-2" />
-                  <span className="text-2xl font-black text-white mono">{state.progress}%</span>
+        {(state.step === 'uploading' || state.step === 'analyzing' || state.step === 'processing') && (
+          <div className="flex-1 flex items-center justify-center animate-in">
+            <div className="w-96 space-y-8 text-center">
+              <div className="relative inline-block">
+                <div className="absolute inset-0 blur-2xl bg-white/5 rounded-full" />
+                <Loader2 className="w-12 h-12 text-white animate-spin-slow relative mx-auto" strokeWidth={1} />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-xl font-medium tracking-tight uppercase tracking-widest italic font-black">
+                  {state.step === 'uploading' ? 'Ingesting Source...' :
+                    state.step === 'analyzing' ? 'Spectral Scan...' :
+                      'Matrix Rendering...'}
+                </h2>
+                <div className="text-[10px] text-[#666] font-mono tracking-[0.5em] animate-pulse">
+                  Processing Hybrid Chain
                 </div>
               </div>
-            </div>
-            <div className="text-center space-y-3">
-              <h3 className="text-3xl font-bold text-white uppercase tracking-widest">
-                {state.step === 'uploading' && 'GCS Ingestion'}
-                {state.step === 'analyzing' && 'Neural Spectral Scan'}
-                {state.step === 'consensus' && 'Agent Deliberation'}
-                {state.step === 'processing' && 'DSP Matrix Rendering'}
-              </h3>
-              <p className="text-blue-400 font-mono text-xs uppercase tracking-[0.5em] animate-pulse">
-                {state.step === 'analyzing' && 'Scanning 20 critical spectral nodes...'}
-                {state.step === 'consensus' && 'Negotiating dynamic range & saturation...'}
-                {state.step === 'processing' && 'Applying Hybrid-Analog Neuro Chain...'}
-              </p>
+              <div className="h-[1px] w-full bg-[#111] overflow-hidden">
+                <div
+                  className="h-full bg-white transition-all duration-700 ease-out"
+                  style={{ width: `${state.progress}%` }}
+                />
+              </div>
             </div>
           </div>
         )}
 
         {state.step === 'completed' && (
-          <div className="space-y-16 py-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-8 glass p-10 rounded-[2.5rem] border-blue-500/20">
-              <div className="flex items-center gap-8">
-                <div className="relative">
-                  <div className="absolute -inset-4 bg-green-500/20 rounded-full blur-xl"></div>
-                  <div className="relative p-6 bg-green-500/10 rounded-full border border-green-500/30">
-                    <CheckCircle2 className="w-12 h-12 text-green-400" />
-                  </div>
-                </div>
-                <div>
-                  <h2 className="text-4xl font-black text-white tracking-tight uppercase">Master Ready.</h2>
-                  <p className="text-gray-400 font-mono text-xs uppercase tracking-widest mt-1">Beatport Top 10 Compliance: Verified</p>
-                </div>
+          <div className="flex-1 flex flex-col overflow-hidden animate-in">
+            <div className="h-12 border-b border-white/5 px-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="w-3 h-3 text-green-500" />
+                <span className="text-[10px] font-mono text-[#666] uppercase tracking-[0.2em]">{state.fileName}</span>
               </div>
-              <div className="flex gap-4 w-full md:w-auto">
-                <button onClick={reset} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-4 glass hover:bg-white/5 rounded-2xl transition-all font-bold">
-                  <RefreshCw className="w-5 h-5" /> New Session
+              <div className="flex items-center gap-3">
+                <button className="flex items-center gap-2 px-3 py-1 bg-white text-black text-[10px] font-bold uppercase tracking-widest rounded-sm hover:opacity-90">
+                  <CreditCard className="w-3 h-3" /> Purchase (High-Res)
                 </button>
-                <a href={state.outputUrl!} download className="flex-1 md:flex-none flex items-center justify-center gap-3 px-10 py-4 bg-blue-600 hover:bg-blue-700 rounded-2xl font-black transition-all neon-glow text-white">
-                  <Download className="w-6 h-6" /> DOWNLOAD MASTER
-                </a>
+                <button onClick={reset} className="p-1 hover:bg-white/5 rounded transition-colors text-[#666]">
+                  <RefreshCw className="w-3 h-3" />
+                </button>
               </div>
             </div>
-
-            {/* A/B Comparison Player */}
-            {state.originalBuffer && state.masteredBuffer && (
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 px-2">
-                  <div className="w-1 h-6 bg-blue-500 rounded-full"></div>
-                  <h3 className="text-xl font-black text-white uppercase tracking-tighter">A/B Comparison Engine</h3>
-                </div>
-                <AudioComparisonPlayer original={state.originalBuffer} mastered={state.masteredBuffer} />
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+              {state.originalBuffer && state.masteredBuffer && (
+                <AudioComparisonPlayer
+                  original={state.originalBuffer}
+                  mastered={state.masteredBuffer}
+                />
+              )}
+              <div className="grid grid-cols-2 gap-8">
+                <AnalysisView metrics={state.analysis || []} />
+                <AgentConsensus opinions={state.consensus || []} finalParams={state.finalParams!} />
               </div>
-            )}
+            </div>
+          </div>
+        )}
 
-            <div className="grid grid-cols-1 gap-16">
-              {state.analysis && <AnalysisView metrics={state.analysis} />}
-              {state.consensus && state.finalParams && <AgentConsensus opinions={state.consensus} finalParams={state.finalParams} />}
+        {state.step === 'failed' && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="text-red-500 font-mono text-xs uppercase tracking-widest">Protocol Failure</div>
+              <p className="text-[#666] text-[10px] max-w-md mx-auto uppercase tracking-widest">{state.error || "System Timeout"}</p>
+              <button onClick={reset} className="px-6 py-2 border border-white/10 hover:bg-white/5 text-[10px] font-bold tracking-widest uppercase rounded-sm transition-all">
+                Back to Console
+              </button>
             </div>
           </div>
         )}
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 z-50 glass border-t border-white/5 px-8 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-6">
+      <footer className="h-8 border-t border-white/5 bg-black px-6 flex items-center justify-between opacity-50 z-50">
+        <div className="flex items-center gap-4 text-[9px] font-mono text-[#444] uppercase tracking-widest">
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest">GCS: Connected</span>
+            <div className="w-1 h-1 rounded-full bg-green-500" />
+            Consensus: Stable
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
-            <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest">Gemini: v2.5-Flash</span>
-          </div>
+          <div className="h-3 w-px bg-white/5" />
+          V6 Core Active
         </div>
-        <div className="text-[9px] font-mono text-gray-600 uppercase tracking-[0.3em]">
-          © 2025 NEURO-MASTER // HYBRID-ANALOG ENGINE
+        <div className="text-[9px] font-mono text-[#222] uppercase tracking-[0.5em]">
+          © 2025 NEURO-MASTER
         </div>
       </footer>
     </div>
