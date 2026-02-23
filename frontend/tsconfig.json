@@ -32,8 +32,16 @@
         }
     },
     "include": [
-        "**/*.ts",
-        "**/*.tsx"
+        "*.ts",
+        "*.tsx",
+        "components/**/*.ts",
+        "components/**/*.tsx",
+        "services/**/*.ts",
+        "types.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
     ],
     "references": [
         {
