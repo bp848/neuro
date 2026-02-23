@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Mastering SaaS — プロダクト全体設計</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Clash+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #04070d;
+    --s1: #070d16;
+    --s2: #0a1220;
+    --border: #101e30;
+    --border2: #1a3050;
+    --text: #7090b0;
+    --white: #c8e0f8;
+    --muted: #253a52;
+    --cyan: #00e5c8;
+    --blue: #3d8fff;
+    --orange: #ff8c00;
+    --green: #00cc88;
+    --red: #ff3355;
+    --purple: #9966ff;
+    --yellow: #ffcc00;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 11.5px;
+    line-height: 1.65;
+    padding: 48px 40px 100px;
+  }
+
+  /* ─ HEADER ─ */
+  .hd { margin-bottom: 52px; }
+  .hd h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 32px;
+    font-weight: 500;
+    color: var(--white);
+    letter-spacing: -0.5px;
+  }
+  .hd .sub { color: var(--muted); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; margin-top: 5px; }
+  .hd .idea { margin-top: 10px; color: var(--cyan); font-size: 12px; font-family: 'DM Sans', sans-serif; }
+
+  /* ─ SECTION ─ */
+  .sec { margin-top: 52px; }
+  .sec-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ─ FREEMIUM FLOW ─ */
+  .flow-track {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    position: relative;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .flow-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 130px;
+    flex: 1;
+  }
+
+  .flow-box {
+    width: 100%;
+    border-radius: 6px;
+    padding: 14px 12px;
+    text-align: center;
+    position: relative;
+  }
+
+  .flow-box.free {
+    background: var(--s1);
+    border: 1px solid var(--border);
+  }
+
+  .flow-box.paid {
+    background: #0a1a0d;
+    border: 1px solid #0d3020;
+  }
+
+  .flow-box.gate {
+    background: #1a1200;
+    border: 2px solid var(--yellow);
+  }
+
+  .flow-step-num {
+    font-size: 9px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+  }
+
+  .flow-step-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--white);
+    margin-bottom: 4px;
+  }
+
+  .flow-step-desc {
+    font-size: 9px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .flow-tag {
+    display: inline-block;
+    font-size: 8px;
+    padding: 1px 6px;
+    border-radius: 2px;
+    margin-top: 6px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+
+  .flow-tag.free { background: #001a14; color: var(--green); }
+  .flow-tag.paid { background: #1a0a00; color: var(--orange); }
+  .flow-tag.gate { background: #1a1200; color: var(--yellow); }
+
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    color: var(--border2);
+    font-size: 16px;
+    flex-shrink: 0;
+    margin-top: -20px;
+  }
+
+  /* ─ USER JOURNEY ─ */
+  .journey {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .journey-card {
+    border-radius: 6px;
+    padding: 16px 18px;
+    border: 1px solid;
+  }
+
+  .journey-card.free-card {
+    background: var(--s1);
+    border-color: var(--border);
+    border-top: 2px solid var(--green);
+  }
+
+  .journey-card.paid-card {
+    background: #080f0a;
+    border-color: #0d2a18;
+    border-top: 2px solid var(--orange);
+  }
+
+  .jc-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+
+  .jc-title.free { color: var(--green); }
+  .jc-title.paid { color: var(--orange); }
+
+  .jc-items {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .jc-item {
+    display: flex;
+    gap: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .jc-icon { flex-shrink: 0; width: 14px; }
+
+  /* ─ EMAIL SPEC ─ */
+  .email-mock {
+    background: #050a10;
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    overflow: hidden;
+    max-width: 560px;
+  }
+
+  .email-header {
+    background: #070f1a;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .email-header strong { color: var(--white); }
+
+  .email-body {
+    padding: 20px 20px;
+  }
+
+  .email-subject {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--white);
+    margin-bottom: 12px;
+  }
+
+  .email-text {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    color: var(--text);
+    margin-bottom: 16px;
+    line-height: 1.7;
+  }
+
+  .email-player-thumb {
+    background: #000d18;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .player-waveform {
+    flex: 1;
+    height: 36px;
+    background: linear-gradient(90deg,
+      #00e5c820 0%, #00e5c870 10%, #00e5c830 20%,
+      #00e5c880 35%, #00e5c840 50%, #00e5c890 65%,
+      #00e5c835 80%, #00e5c860 90%, #00e5c825 100%
+    );
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .player-waveform::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      90deg, transparent, transparent 3px, #000d1888 3px, #000d1888 4px
+    );
+  }
+
+  .player-btn {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--cyan);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #000;
+    flex-shrink: 0;
+  }
+
+  .player-ab {
+    background: #0a1a14;
+    border: 1px solid #00e5c840;
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 9px;
+    color: var(--cyan);
+    flex-shrink: 0;
+  }
+
+  .email-cta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .cta-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 9px 18px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .cta-btn.primary {
+    background: var(--cyan);
+    color: #000;
+  }
+
+  .cta-btn.secondary {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--text);
+  }
+
+  .email-scores {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .score-chip {
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    text-align: center;
+  }
+
+  .score-val {
+    font-size: 18px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    color: var(--white);
+  }
+
+  .score-label {
+    font-size: 8px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+
+  .score-chip.composer .score-val { color: var(--blue); }
+  .score-chip.audience .score-val  { color: var(--green); }
+  .score-chip.engineer .score-val  { color: var(--orange); }
+
+  /* ─ CONVERSION ─ */
+  .gate-box {
+    background: #100e00;
+    border: 2px solid var(--yellow);
+    border-radius: 8px;
+    padding: 20px 24px;
+    position: relative;
+  }
+
+  .gate-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--yellow);
+    margin-bottom: 8px;
+  }
+
+  .gate-desc {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+
+  .purchase-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+
+  .purchase-opt {
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 14px;
+    text-align: center;
+  }
+
+  .purchase-opt.recommended {
+    border-color: var(--cyan);
+    background: #001a16;
+  }
+
+  .opt-price {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--white);
+    margin-bottom: 4px;
+  }
+
+  .opt-name {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .opt-items {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+  }
+
+  .opt-items li {
+    font-size: 10px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    padding-left: 12px;
+    position: relative;
+  }
+
+  .opt-items li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--cyan);
+    font-size: 9px;
+  }
+
+  .opt-btn {
+    margin-top: 10px;
+    width: 100%;
+    padding: 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text);
+  }
+
+  .opt-btn.primary {
+    background: var(--cyan);
+    color: #000;
+    border: none;
+  }
+
+  /* ─ SC FLOW ─ */
+  .sc-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .sc-step {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px 14px;
+  }
+
+  .sc-step-num {
+    font-size: 9px;
+    color: var(--cyan);
+    min-width: 16px;
+    margin-top: 2px;
+  }
+
+  .sc-step-body {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .sc-step-body strong { color: var(--white); }
+  .sc-step-body code {
+    background: #050c15;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--cyan);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+  }
+
+  /* ─ TBD ─ */
+  .tbd {
+    background: var(--s1);
+    border: 1px dashed var(--border2);
+    border-radius: 6px;
+    padding: 16px 20px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .tbd strong { color: var(--white); display: block; margin-bottom: 4px; font-size: 13px; }
+
+  /* ─ CALLOUT ─ */
+  .callout {
+    border-radius: 5px;
+    padding: 12px 16px;
+    margin-top: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .callout.cyan  { background: #001a18; border: 1px solid #003030; color: var(--cyan); }
+  .callout.warn  { background: #100e00; border: 1px solid #302800; color: var(--yellow); }
+  .callout.green { background: #001a0d; border: 1px solid #003018; color: var(--green); }
+
+</style>
+</head>
+<body>
+
+<div class="hd">
+  <h1>AI Mastering SaaS — プロダクト全体設計</h1>
+  <div class="sub">Freemium × A/B Player × SoundCloud OAuth × Purchase Flow</div>
+  <div class="idea">「聴いてから買う」— 無料でマスタリング体験、納得したら購入</div>
+</div>
+
+<!-- ══════════ 1. FREEMIUM FLOW ══════════ -->
+<div class="sec">
+  <div class="sec-title">01 — フリーミアム フロー</div>
+
+  <div class="flow-track">
+    <div class="flow-node">
+      <div class="flow-box free">
+        <div class="flow-step-num">STEP 1</div>
+        <div class="flow-step-title">音源アップロード</div>
+        <div class="flow-step-desc">WAV / AIFF<br>GCS に保存</div>
+        <span class="flow-tag free">FREE</span>
+      </div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">
+      <div class="flow-box free">
+        <div class="flow-step-num">STEP 2</div>
+        <div class="flow-step-title">Gemini 分析</div>
+        <div class="flow-step-desc">33項目<br>BS.1770 LUFS</div>
+        <span class="flow-tag free">FREE</span>
+      </div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">
+      <div class="flow-box free">
+        <div class="flow-step-num">STEP 3</div>
+        <div class="flow-step-title">3AI 合議</div>
+        <div class="flow-step-desc">Gemini / Claude<br>/ ChatGPT</div>
+        <span class="flow-tag free">FREE</span>
+      </div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">
+      <div class="flow-box free">
+        <div class="flow-step-num">STEP 4</div>
+        <div class="flow-step-title">DSP マスタリング</div>
+        <div class="flow-step-desc">ウォーターマーク版<br>を生成</div>
+        <span class="flow-tag free">FREE</span>
+      </div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">
+      <div class="flow-box free">
+        <div class="flow-step-num">STEP 5</div>
+        <div class="flow-step-title">メール送信</div>
+        <div class="flow-step-desc">A/Bプレイヤー URL<br>分析レポート付き</div>
+        <span class="flow-tag free">FREE</span>
+      </div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">
+      <div class="flow-box gate">
+        <div class="flow-step-num">GATE</div>
+        <div class="flow-step-title">「買いますか？」</div>
+        <div class="flow-step-desc">プレイヤー内の<br>購入ボタン</div>
+        <span class="flow-tag gate">CONVERT</span>
+      </div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">
+      <div class="flow-box paid">
+        <div class="flow-step-num">PAID</div>
+        <div class="flow-step-title">購入後</div>
+        <div class="flow-step-desc">WAV DL<br>SC自動投稿 etc.</div>
+        <span class="flow-tag paid">PAID</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 2. FREE vs PAID ══════════ -->
+<div class="sec">
+  <div class="sec-title">02 — 無料 / 有料 コンテンツ</div>
+
+  <div class="journey">
+    <div class="journey-card free-card">
+      <div class="jc-title free">✓ 無料で提供するもの</div>
+      <ul class="jc-items">
+        <li class="jc-item"><span class="jc-icon">🎵</span>A/Bプレイヤー再生（ウォーターマークあり）</li>
+        <li class="jc-item"><span class="jc-icon">📊</span>分析レポート 33項目フル表示</li>
+        <li class="jc-item"><span class="jc-icon">🏆</span>3AI合議スコア（Composer / Audience / Engineer）</li>
+        <li class="jc-item"><span class="jc-icon">🎯</span>レーベル・コンテスト レコメンド表示</li>
+        <li class="jc-item"><span class="jc-icon">📧</span>結果メール送信（A/Bプレイヤー URL付き）</li>
+        <li class="jc-item"><span class="jc-icon">💬</span>AIフィードバックテキスト（改善提案）</li>
+      </ul>
+    </div>
+    <div class="journey-card paid-card">
+      <div class="jc-title paid">$ 購入後に解放するもの</div>
+      <ul class="jc-items">
+        <li class="jc-item"><span class="jc-icon">⬇️</span>ウォーターマークなし WAVダウンロード（24bit）</li>
+        <li class="jc-item"><span class="jc-icon">🔶</span>SoundCloud 自動アップロード（OAuth連携時）</li>
+        <li class="jc-item"><span class="jc-icon">📤</span>レーベルへのデモ送付代行（Submithub / Groover）</li>
+        <li class="jc-item"><span class="jc-icon">📁</span>Google Drive / Dropbox 自動保存（MCP）</li>
+        <li class="jc-item"><span class="jc-icon">🔗</span>SoundCloud Private Link 発行</li>
+        <li class="jc-item"><span class="jc-icon">♾️</span>セクション別 Dynamic Mastering（Pro）</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 3. EMAIL ══════════ -->
+<div class="sec">
+  <div class="sec-title">03 — メール仕様（受け取り側が見るもの）</div>
+
+  <div class="email-mock">
+    <div class="email-header">
+      <strong>From:</strong> mastering@yourservice.com &nbsp;·&nbsp;
+      <strong>To:</strong> artist@email.com &nbsp;·&nbsp;
+      <strong>Subject:</strong> あなたのマスタリングが完成しました — 聴いてみてください
+    </div>
+    <div class="email-body">
+      <div class="email-subject">🎧 "TRACK NAME" のマスタリングが完成しました</div>
+      <div class="email-text">
+        3つのAIが合議し、Beatport基準に最適化したマスタリングが完成しました。<br>
+        以下のプレイヤーでBefore / After を聴き比べてください。
+      </div>
+
+      <!-- SCORES -->
+      <div class="email-scores">
+        <div class="score-chip composer">
+          <div class="score-val">87</div>
+          <div class="score-label">Composer</div>
+        </div>
+        <div class="score-chip audience">
+          <div class="score-val">91</div>
+          <div class="score-label">Audience</div>
+        </div>
+        <div class="score-chip engineer">
+          <div class="score-val">95</div>
+          <div class="score-label">Engineer</div>
+        </div>
+      </div>
+
+      <!-- PLAYER THUMB -->
+      <div class="email-player-thumb">
+        <div class="player-btn">▶</div>
+        <div class="player-waveform"></div>
+        <div class="player-ab">A/B</div>
+      </div>
+
+      <!-- CTA -->
+      <div class="email-cta">
+        <div class="cta-btn primary">🎵 プレイヤーで聴く・比較する</div>
+        <div class="cta-btn secondary">📊 分析レポートを見る</div>
+      </div>
+
+      <div style="margin-top:14px; font-family:'DM Sans',sans-serif; font-size:11px; color:#253a52;">
+        ※ 無料版はウォーターマークあり。プレイヤー内の購入ボタンで完全版を取得できます。
+      </div>
+    </div>
+  </div>
+
+  <div class="callout cyan" style="margin-top:10px;">
+    <strong>URLの構造:</strong> <code>https://yourservice.com/player/{jobId}?token={shareToken}</code><br>
+    shareToken は 72時間有効。プレイヤーはホスティング済みでブラウザだけで再生可能。ダウンロード不可。
+  </div>
+</div>
+
+<!-- ══════════ 4. PURCHASE GATE ══════════ -->
+<div class="sec">
+  <div class="sec-title">04 — 購入ゲート（プレイヤー内）— TBD</div>
+
+  <div class="gate-box">
+    <div class="gate-title">このクオリティで仕上げましたか？</div>
+    <div class="gate-desc">ウォーターマークなしの完全版 + 追加オプションを選択してください。</div>
+
+    <div class="purchase-options">
+      <div class="purchase-opt">
+        <div class="opt-name">Single</div>
+        <div class="opt-price">¥1,980</div>
+        <ul class="opt-items">
+          <li>WAV ダウンロード</li>
+          <li>72時間有効</li>
+        </ul>
+        <div class="opt-btn">選択する</div>
+      </div>
+      <div class="purchase-opt recommended">
+        <div class="opt-name">Single + SC</div>
+        <div class="opt-price">¥2,980</div>
+        <ul class="opt-items">
+          <li>WAV ダウンロード</li>
+          <li>SoundCloud 自動投稿</li>
+          <li>Private Link 発行</li>
+          <li>レーベル送付 3件</li>
+        </ul>
+        <div class="opt-btn primary">おすすめ</div>
+      </div>
+      <div class="purchase-opt">
+        <div class="opt-name">Pro</div>
+        <div class="opt-price">¥4,980</div>
+        <ul class="opt-items">
+          <li>WAV + FLAC</li>
+          <li>SoundCloud 投稿</li>
+          <li>Drive / Dropbox 保存</li>
+          <li>レーベル送付 10件</li>
+          <li>GitHub メタ自動 push</li>
+        </ul>
+        <div class="opt-btn">選択する</div>
+      </div>
+    </div>
+
+    <div class="callout warn" style="margin-top:14px;">
+      <strong>⚠ TBD:</strong> 価格・プラン構成・Stripe連携の詳細は別途決定。上記はたたき台。
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 5. SOUNDCLOUD OAUTH ══════════ -->
+<div class="sec">
+  <div class="sec-title">05 — SoundCloud OAuth 連携フロー</div>
+
+  <div class="sc-steps">
+    <div class="sc-step">
+      <div class="sc-step-num">1</div>
+      <div class="sc-step-body"><strong>初回のみ:</strong> プレイヤーの「SoundCloudに保存」ボタン → SoundCloud OAuth 2.0 認証画面へリダイレクト</div>
+    </div>
+    <div class="sc-step">
+      <div class="sc-step-num">2</div>
+      <div class="sc-step-body"><strong>トークン保存:</strong> アクセストークンを暗号化してDB保存。以降は自動実行。</div>
+    </div>
+    <div class="sc-step">
+      <div class="sc-step-num">3</div>
+      <div class="sc-step-body"><strong>購入完了時:</strong> GCS の <code>mastered.wav</code> → SoundCloud API <code>POST /tracks</code> でユーザーのアカウントに投稿</div>
+    </div>
+    <div class="sc-step">
+      <div class="sc-step-num">4</div>
+      <div class="sc-step-body"><strong>Private設定:</strong> <code>sharing: "private"</code> で投稿。タイトル / BPM / ジャンル / キーを <code>analysis.json</code> から自動セット。</div>
+    </div>
+    <div class="sc-step">
+      <div class="sc-step-num">5</div>
+      <div class="sc-step-body"><strong>Private Link 発行:</strong> <code>track.secret_token</code> を取得 → <code>soundcloud.com/.../s-XXXX</code> 形式のリンクをUIに表示。レーベル送付にそのまま使用。</div>
+    </div>
+  </div>
+
+  <div class="callout green" style="margin-top:10px;">
+    <strong>規約クリア:</strong> ユーザー自身のOAuthトークンで、ユーザー自身のコンテンツをアップロードする形式。
+    SaaSがコンテンツを所有・管理するわけではないため、商用API制限に抵触しない。
+    AIデータ学習リスクについては初回連携時に説明文を表示してユーザーが判断できるようにする。
+  </div>
+</div>
+
+<!-- ══════════ 6. NEXT ══════════ -->
+<div class="sec">
+  <div class="sec-title">06 — 次に決めること</div>
+
+  <div class="tbd">
+    <strong>購入フロー（Stripe連携）の詳細</strong>
+    単曲購入 / サブスク / クレジット制 — どれにするか
+  </div>
+  <div class="tbd" style="margin-top:8px;">
+    <strong>プレイヤーのホスティング</strong>
+    MasteringVisualizer を Vercel / Cloud Run どちらにデプロイするか
+  </div>
+  <div class="tbd" style="margin-top:8px;">
+    <strong>GitHub への自動 push 対象</strong>
+    analysis.json / アートワーク / プレスキットMD を何のリポジトリに push するか（アーティストの既存リポジトリ or 自動生成リポジトリ）
+  </div>
+</div>
+
+</body>
+</html>

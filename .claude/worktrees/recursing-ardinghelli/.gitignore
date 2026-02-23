@@ -1,0 +1,21 @@
+# Node.js
+node_modules/
+dist/
+build/
+.env*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+.vercel
+sa-key.json
