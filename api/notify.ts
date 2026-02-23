@@ -1,49 +1,55 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || '');
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-    if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
+export const config = {
+    runtime: 'edge',
+};
 
-    const { email, jobId, fileName } = req.body;
-
-    if (!email || !jobId) {
-        return res.status(400).json({ error: 'Missing email or jobId' });
+export default async function handler(req: Request) {
+    if (req.method !== 'POST') {
+        return new Response('Method not allowed', { status: 405 });
     }
 
     try {
+        const { email, jobId, fileName } = await req.json();
+
+        if (!email || !jobId) {
+            return new Response('Missing required fields', { status: 400 });
+        }
+
         const { data, error } = await resend.emails.send({
-            from: process.env.EMAIL_FROM || 'Neuro-Master <onboarding@resend.dev>',
+            from: 'Neuro-Master <onboarding@resend.dev>',
             to: [email],
-            subject: `Mastering Complete: ${fileName || 'Your Track'}`,
+            subject: 'Mastering Completed: ' + (fileName || 'Your Track'),
             html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #333; background-color: #0a0a0a; color: #fff;">
-          <h1 style="color: #00ffcc; text-transform: uppercase; letter-spacing: 2px;">Your Master is Ready</h1>
-          <p>Hello,</p>
-          <p>The AI mastering process for <strong>${fileName || 'your track'}</strong> has been completed successfully.</p>
-          <p>You can now listen to the results and download your mastered file by clicking the button below:</p>
-          <div style="margin: 30px 0;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL}/?job=${jobId}" 
-               style="background-color: #00ffcc; color: #000; padding: 15px 25px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
-               VIEW MASTERING RESULT
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #000; color: #fff; border-radius: 12px;">
+          <h1 style="font-style: italic; font-weight: 900; letter-spacing: -0.05em; text-transform: uppercase;">Neuro-Master</h1>
+          <p style="color: #666; text-transform: uppercase; font-size: 10px; letter-spacing: 0.3em;">Status: Signal Processed</p>
+          <div style="margin: 40px 0; padding: 30px; background-color: #111; border: 1px solid #222; border-radius: 8px;">
+            <p style="margin: 0; font-size: 14px; color: #888;">Track Name</p>
+            <p style="margin: 5px 0 20px 0; font-size: 18px; font-weight: bold;">${fileName || 'Processed Audio'}</p>
+            <a href="https://neuro-master-beatport-top-10-ai.vercel.app/?jobId=${jobId}" 
+               style="display: inline-block; padding: 12px 24px; background-color: #fff; color: #000; text-decoration: none; font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; border-radius: 4px;">
+              Listen & Finalize
             </a>
           </div>
-          <p style="font-size: 0.8em; color: #666;">If you didn't request this email, please ignore it.</p>
-          <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;" />
-          <p style="color: #00ffcc; font-weight: bold;">NEURO-MASTER | AI Driven Audio Mastering</p>
+          <p style="font-size: 10px; color: #444; text-transform: uppercase; letter-spacing: 0.1em;">
+            © 2025 NEURO-MASTER // Beatport Top 10 Standard
+          </p>
         </div>
       `,
         });
 
         if (error) {
-            console.error('Resend Error:', error);
-            return res.status(500).json({ error: error.message });
+            return new Response(JSON.stringify(error), { status: 400 });
         }
 
-        return res.status(200).json({ success: true, data });
-    } catch (err: any) {
-        console.error('Notification API Error:', err);
-        return res.status(500).json({ error: err.message });
+        return new Response(JSON.stringify(data), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    } catch (error: any) {
+        return new Response(error.message, { status: 500 });
     }
 }
