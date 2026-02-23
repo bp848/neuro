@@ -1,8 +1,0 @@
-
-{
-  "name": "NEURO-MASTER: Beatport Top 10 AI",
-  "description": "A world-class, agent-driven automatic mastering suite. Features a Hybrid-Analog DSP engine, 20-point spectral analysis, and a tri-perspective AI consensus board. Includes a high-fidelity A/B comparison engine for real-time before/after evaluation.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}
