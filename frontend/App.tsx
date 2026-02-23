@@ -4,7 +4,7 @@ import { MasteringFlow } from './components/MasteringFlow';
 import { AnalysisView } from './components/AnalysisView';
 import { AgentConsensus } from './components/AgentConsensus';
 import { AudioComparisonPlayer } from './components/AudioComparisonPlayer';
-import { AlgorithmView } from './components/AlgorithmView';
+import { AlgorithmView } from '@/components/AlgorithmView';
 import { MasteringState } from './types';
 import { Loader2, CheckCircle2, RefreshCw, CreditCard } from 'lucide-react';
 import { supabase } from './services/supabaseClient';

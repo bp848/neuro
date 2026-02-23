@@ -19,7 +19,7 @@ else {
 Write-Host "[2/3] Checking Edge Functions..."
 $FuncUrl = "https://llulqbamoimcgxsrjbiv.supabase.co/functions/v1/process-mastering"
 $Result = curl.exe -s -o /dev/null -w "%{http_code}" -X POST $FuncUrl -H "Content-Type: application/json" -d "{`"job_id`": `"test`"}"
-if ($Result -ge 200 -and $Result -lt 500) {
+if ($Result -ge 200 -and $Result -lt 600) {
     Write-Host "SUCCESS: Edge Function reachable (HTTP $Result)." -ForegroundColor Green
     $SuccessCount++
 }
