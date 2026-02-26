@@ -43,7 +43,7 @@ export default function App() {
         setState(prev => ({ ...prev, step: 'idle', error: job.error_message }));
         return;
       }
-      const publicUrl = job.output_path?.replace('gs://', 'https://storage.googleapis.com/') ?? null;
+      const publicUrl = job.output_url ?? null;
       setState(prev => ({
         ...prev, step: job.status as any, analysis: job.metrics,
         consensus: job.consensus_opinions, finalParams: job.final_params,
@@ -58,7 +58,7 @@ export default function App() {
         { event: 'UPDATE', schema: 'public', table: 'mastering_jobs', filter: `id=eq.${activeJobId}` },
         (payload) => {
           const job = payload.new;
-          const publicUrl = job.output_path?.replace('gs://', 'https://storage.googleapis.com/') ?? null;
+          const publicUrl = job.output_url ?? null;
           if (job.status === 'failed') {
             setState(prev => ({ ...prev, step: 'idle', progress: 0, error: job.error_message || 'Processing failed.' }));
             setActiveJobId(null); channel.unsubscribe(); return;
