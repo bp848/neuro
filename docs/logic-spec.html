@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>解析・マスタリング・合議 — 洗練されたロジック仕様書</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#06060b;--s1:#0c0c15;--s2:#131320;--s3:#1a1a2c;
+    --border:#222240;--border-hi:#333360;
+    --text:#d8d8e8;--muted:#7878a0;--dim:#4a4a68;
+    --accent:#818cf8;--purple:#a78bfa;--green:#34d399;--red:#f87171;--amber:#fbbf24;--cyan:#22d3ee;--pink:#f472b6;--orange:#fb923c;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);line-height:1.8;font-size:14px;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  .hero{position:relative;padding:68px 32px 52px;text-align:center;border-bottom:1px solid var(--border);overflow:hidden;}
+  .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 600px 280px at 50% 0%,#818cf812 0%,transparent 70%);pointer-events:none;}
+  .hero-tag{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--accent);margin-bottom:14px;}
+  .hero h1{font-size:32px;font-weight:700;letter-spacing:-0.5px;margin-bottom:10px;background:linear-gradient(135deg,#e0e0f0,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .hero p{color:var(--muted);font-size:14px;max-width:640px;margin:0 auto;}
+
+  .container{max-width:1100px;margin:0 auto;padding:0 28px;}
+
+  .section{margin:56px 0;}
+  .section-head{display:flex;align-items:center;gap:12px;margin-bottom:24px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+  .section-num{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;background:var(--accent);color:var(--bg);padding:3px 9px;border-radius:4px;letter-spacing:1px;}
+  .section-head h3{font-size:20px;font-weight:700;}
+
+  .card{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:14px;}
+  .card-a{border-left:3px solid var(--accent);}
+  .card-g{border-left:3px solid var(--green);}
+  .card-r{border-left:3px solid var(--red);}
+  .card-c{border-left:3px solid var(--cyan);}
+  .card-p{border-left:3px solid var(--purple);}
+  .card-o{border-left:3px solid var(--orange);}
+  .card-pk{border-left:3px solid var(--pink);}
+  .card h4{font-size:15px;font-weight:600;margin-bottom:8px;}
+  .card p{font-size:13px;color:var(--muted);}
+
+  code{font-family:'JetBrains Mono',monospace;background:var(--s2);padding:2px 7px;border-radius:4px;font-size:12px;color:#c084fc;}
+  pre{font-family:'JetBrains Mono',monospace;background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:18px;font-size:11.5px;line-height:1.75;overflow-x:auto;color:#c0c0d8;margin:12px 0;}
+  pre .cm{color:#505070;font-style:italic;} pre .kw{color:#c792ea;} pre .str{color:#c3e88d;} pre .num{color:#f78c6c;} pre .fn{color:#82aaff;} pre .tp{color:#ffcb6b;} pre .dc{color:#89ddff;}
+
+  table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:13px;margin:14px 0;}
+  thead th{background:var(--s2);padding:10px 14px;text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--dim);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);}
+  tbody td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+  tbody tr:last-child td{border-bottom:none;}
+
+  .tag{display:inline-block;padding:2px 9px;border-radius:4px;font-size:11px;font-weight:600;font-family:'JetBrains Mono',monospace;white-space:nowrap;}
+  .tag-g{background:#34d39920;color:var(--green);}
+  .tag-r{background:#f8717120;color:var(--red);}
+  .tag-a{background:#fbbf2420;color:var(--amber);}
+  .tag-b{background:#818cf820;color:var(--accent);}
+  .tag-p{background:#a78bfa20;color:var(--purple);}
+  .tag-c{background:#22d3ee20;color:var(--cyan);}
+
+  .chain{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:14px 0;padding:16px;background:var(--s1);border:1px solid var(--border);border-radius:8px;}
+  .chain-b{background:var(--s3);border:1px solid var(--border-hi);border-radius:6px;padding:7px 12px;font-size:11px;font-weight:600;font-family:'JetBrains Mono',monospace;white-space:nowrap;}
+  .chain-b.hl{border-color:var(--green);color:var(--green);}
+  .chain-a{color:var(--dim);font-size:15px;}
+
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  @media(max-width:768px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+  ul,ol{padding-left:20px;}
+  li{font-size:13px;color:var(--muted);margin-bottom:5px;}
+  li strong{color:var(--text);}
+
+  .highlight{border:1px solid var(--accent);background:#818cf808;border-radius:10px;padding:22px 26px;margin:16px 0;}
+
+  .agent-card{background:var(--s2);border:1px solid var(--border-hi);border-radius:10px;padding:20px;position:relative;overflow:hidden;}
+  .agent-card::before{content:'';position:absolute;top:0;left:0;width:100%;height:3px;}
+  .agent-card.a1::before{background:var(--cyan);}
+  .agent-card.a2::before{background:var(--orange);}
+  .agent-card.a3::before{background:var(--pink);}
+  .agent-card.a4::before{background:var(--green);}
+  .agent-card h5{font-size:13px;font-weight:700;margin-bottom:6px;}
+  .agent-card p{font-size:12px;color:var(--muted);}
+
+  .footer{margin-top:56px;padding:24px 0;border-top:1px solid var(--border);text-align:center;font-size:12px;color:var(--dim);font-family:'JetBrains Mono',monospace;}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-tag">Core Logic Specification v1.0</div>
+  <h1>解析 → マスタリング → 合議<br>洗練されたロジック仕様書</h1>
+  <p>3つの核心モジュールの設計原則、アルゴリズム、実装コードを網羅する技術仕様</p>
+</div>
+
+<div class="container">
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--                    PART A: 解析 (Analysis)                     -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">A</span>
+    <h3>解析ロジック — 8次元オーディオ・プロファイリング</h3>
+  </div>
+
+  <div class="card card-c">
+    <h4>設計思想</h4>
+    <p>
+      解析の目的は2つ：<strong>① AI パラメータ生成への正確な入力データ提供</strong>と
+      <strong>② ユーザーに改善余地を視覚的に納得させること</strong>。
+      単純な LUFS 測定だけでは不十分。8 次元のプロファイルを生成し、
+      楽曲の「性格」を構造的に把握する。
+    </p>
+  </div>
+
+  <div class="card card-g">
+    <h4>8次元プロファイル</h4>
+    <table>
+      <thead><tr><th>#</th><th>次元</th><th>計測内容</th><th>AI への入力</th><th>ユーザー表示</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><strong>Integrated LUFS</strong></td><td>BS.1770-4 (K重み+ダブルゲーティング)</td><td>目標差分 → gain_adjustment</td><td>「-18.2 LUFS → 目標 -14.0」</td></tr>
+        <tr><td>2</td><td><strong>True Peak (dBTP)</strong></td><td>4x OS + ピーク検出</td><td>limiter_ceiling の決定</td><td>「-0.8 dBTP ✓ / +0.3 dBTP ⚠</td></tr>
+        <tr><td>3</td><td><strong>Short-term LUFS 列</strong></td><td>3秒窓 × 曲全体</td><td>ダイナミクス変動の把握</td><td>ラウドネス経時グラフ</td></tr>
+        <tr><td>4</td><td><strong>Crest Factor</strong></td><td>Peak - RMS (dB)</td><td>コンプ ratio の参考値</td><td>「12.3 dB（広い）」</td></tr>
+        <tr><td>5</td><td><strong>スペクトラル・バランス</strong></td><td>1/3 オクターブ帯域エネルギー</td><td>EQ バンドの freq/gain 決定</td><td>スペクトラム vs 理想曲線</td></tr>
+        <tr><td>6</td><td><strong>M/S エネルギー比</strong></td><td>Mid パワー / Side パワー</td><td>stereo_width パラメータ</td><td>「ステレオ幅: 0.72（やや狭い）」</td></tr>
+        <tr><td>7</td><td><strong>低域密度</strong></td><td>30-120Hz エネルギー / 全体</td><td>Pultec contour 量</td><td>「低域: 適正 / 過剰 / 不足」</td></tr>
+        <tr><td>8</td><td><strong>トランジェント密度</strong></td><td>Onset 検出数 / 秒</td><td>clipper threshold, attack 時間</td><td>「トランジェント: 密（EDM向き）」</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <pre><span class="cm"># ── analysis_engine.py ──</span>
+
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+<span class="kw">from</span> scipy.signal <span class="kw">import</span> sosfilt, butter, find_peaks, resample_poly
+<span class="kw">from</span> dataclasses <span class="kw">import</span> dataclass, asdict
+<span class="kw">from</span> typing <span class="kw">import</span> List
+
+<span class="dc">@dataclass</span>
+<span class="kw">class</span> <span class="tp">AudioProfile</span>:
+    <span class="str">"""8次元オーディオ・プロファイル"""</span>
+    integrated_lufs: <span class="tp">float</span>
+    true_peak_dbtp: <span class="tp">float</span>
+    short_term_lufs: <span class="tp">List[float]</span>      <span class="cm"># 3秒窓の時系列</span>
+    crest_factor_db: <span class="tp">float</span>
+    spectral_balance: <span class="tp">dict</span>            <span class="cm"># {band_hz: energy_db}</span>
+    ms_ratio: <span class="tp">float</span>                    <span class="cm"># mid_energy / total_energy (0-1)</span>
+    low_density: <span class="tp">float</span>                 <span class="cm"># 30-120Hz / total (0-1)</span>
+    transient_density: <span class="tp">float</span>           <span class="cm"># onsets / second</span>
+    sample_rate: <span class="tp">int</span>
+    bit_depth: <span class="tp">int</span>
+    duration_sec: <span class="tp">float</span>
+    channel_count: <span class="tp">int</span>
+
+
+<span class="cm"># ── 1. BS.1770-4 LUFS (K重み + ダブルゲーティング) ──</span>
+
+<span class="kw">def</span> <span class="fn">_build_k_weight_sos</span>(sr: <span class="tp">int</span>) -> np.ndarray:
+    <span class="str">"""ITU-R BS.1770 K-weighting: pre-filter (shelf) + RLB (HPF)"""</span>
+    <span class="kw">if</span> sr == <span class="num">48000</span>:
+        pre = np.array([[<span class="num">1.53512485958697</span>, -<span class="num">2.69169618940638</span>, <span class="num">1.19839281085285</span>,
+                         <span class="num">1.0</span>, -<span class="num">1.69065929318241</span>, <span class="num">0.73248077421585</span>]])
+        rlb = np.array([[<span class="num">1.0</span>, -<span class="num">2.0</span>, <span class="num">1.0</span>,
+                         <span class="num">1.0</span>, -<span class="num">1.99004745483398</span>, <span class="num">0.99007225036621</span>]])
+    <span class="kw">else</span>:
+        pre = _bilinear_shelf(sr, <span class="num">1681.0</span>, <span class="num">4.0</span>)
+        rlb = _bilinear_hpf(sr, <span class="num">38.0</span>)
+    <span class="kw">return</span> np.vstack([pre, rlb])
+
+
+<span class="kw">def</span> <span class="fn">measure_integrated_lufs</span>(left: np.ndarray, right: np.ndarray, sr: <span class="tp">int</span>) -> <span class="tp">float</span>:
+    <span class="str">"""EBU R128 準拠 Integrated Loudness"""</span>
+    k_sos = _build_k_weight_sos(sr)
+    left_k = sosfilt(k_sos, left)
+    right_k = sosfilt(k_sos, right)
+
+    block = <span class="kw">int</span>(sr * <span class="num">0.4</span>)
+    hop = <span class="kw">int</span>(sr * <span class="num">0.1</span>)
+    powers = []
+    i = <span class="num">0</span>
+    <span class="kw">while</span> i + block <= len(left_k):
+        pwr = np.mean(left_k[i:i+block]**<span class="num">2</span>) + np.mean(right_k[i:i+block]**<span class="num">2</span>)
+        powers.append(pwr)
+        i += hop
+
+    <span class="kw">if not</span> powers: <span class="kw">return</span> -<span class="num">70.0</span>
+    powers = np.array(powers)
+
+    abs_th = <span class="num">10</span> ** ((-<span class="num">70</span> + <span class="num">0.691</span>) / <span class="num">10</span>)
+    gated = powers[powers > abs_th]
+    <span class="kw">if</span> len(gated) == <span class="num">0</span>: <span class="kw">return</span> -<span class="num">70.0</span>
+
+    rel_th = np.mean(gated) * <span class="num">10</span>**(-<span class="num">10</span>/<span class="num">10</span>)
+    final = gated[gated > rel_th]
+    <span class="kw">if</span> len(final) == <span class="num">0</span>: <span class="kw">return</span> -<span class="num">70.0</span>
+
+    <span class="kw">return</span> -<span class="num">0.691</span> + <span class="num">10</span> * np.log10(np.mean(final))
+
+
+<span class="kw">def</span> <span class="fn">measure_true_peak</span>(left: np.ndarray, right: np.ndarray, sr: <span class="tp">int</span>) -> <span class="tp">float</span>:
+    l_up = resample_poly(left, <span class="num">4</span>, <span class="num">1</span>)
+    r_up = resample_poly(right, <span class="num">4</span>, <span class="num">1</span>)
+    peak = max(np.max(np.abs(l_up)), np.max(np.abs(r_up)))
+    <span class="kw">return</span> <span class="num">20</span> * np.log10(max(peak, <span class="num">1e-10</span>))
+
+
+<span class="kw">def</span> <span class="fn">measure_short_term_lufs</span>(left, right, sr) -> <span class="tp">List[float]</span>:
+    k_sos = _build_k_weight_sos(sr)
+    l_k, r_k = sosfilt(k_sos, left), sosfilt(k_sos, right)
+    block = <span class="kw">int</span>(sr * <span class="num">3.0</span>)
+    hop = <span class="kw">int</span>(sr * <span class="num">1.0</span>)
+    result = []
+    i = <span class="num">0</span>
+    <span class="kw">while</span> i + block <= len(l_k):
+        pwr = np.mean(l_k[i:i+block]**<span class="num">2</span>) + np.mean(r_k[i:i+block]**<span class="num">2</span>)
+        result.append(round(-<span class="num">0.691</span> + <span class="num">10</span> * np.log10(max(pwr, <span class="num">1e-10</span>)), <span class="num">1</span>))
+        i += hop
+    <span class="kw">return</span> result
+
+
+<span class="kw">def</span> <span class="fn">measure_spectral_balance</span>(left, right, sr) -> <span class="tp">dict</span>:
+    mono = (left + right) * <span class="num">0.5</span>
+    n_fft = <span class="num">8192</span>
+    hop = n_fft // <span class="num">2</span>
+    window = np.hanning(n_fft)
+    acc = np.zeros(n_fft // <span class="num">2</span> + <span class="num">1</span>)
+    count = <span class="num">0</span>
+    i = <span class="num">0</span>
+    <span class="kw">while</span> i + n_fft <= len(mono):
+        frame = mono[i:i+n_fft] * window
+        acc += np.abs(np.fft.rfft(frame)) ** <span class="num">2</span>
+        count += <span class="num">1</span>
+        i += hop
+    <span class="kw">if</span> count == <span class="num">0</span>: <span class="kw">return</span> {}
+    avg = acc / count
+    freqs = np.fft.rfftfreq(n_fft, <span class="num">1.0</span> / sr)
+    centers = [<span class="num">31.5</span>,<span class="num">63</span>,<span class="num">125</span>,<span class="num">250</span>,<span class="num">500</span>,<span class="num">1000</span>,<span class="num">2000</span>,<span class="num">4000</span>,<span class="num">8000</span>,<span class="num">16000</span>]
+    factor = <span class="num">2</span>**(<span class="num">1</span>/<span class="num">6</span>)
+    result = {}
+    <span class="kw">for</span> fc <span class="kw">in</span> centers:
+        mask = (freqs >= fc/factor) & (freqs < fc*factor)
+        <span class="kw">if</span> np.any(mask):
+            result[fc] = round(<span class="num">10</span>*np.log10(max(np.sum(avg[mask]),<span class="num">1e-20</span>)),<span class="num">1</span>)
+    <span class="kw">return</span> result
+
+
+<span class="kw">def</span> <span class="fn">measure_ms_ratio</span>(left, right) -> <span class="tp">float</span>:
+    mid = (left + right) * <span class="num">0.5</span>
+    mid_e = np.sum(mid**<span class="num">2</span>)
+    total = mid_e + np.sum(((left - right) * <span class="num">0.5</span>)**<span class="num">2</span>)
+    <span class="kw">return</span> round(mid_e / max(total, <span class="num">1e-10</span>), <span class="num">3</span>)
+
+
+<span class="kw">def</span> <span class="fn">measure_transient_density</span>(left, right, sr) -> <span class="tp">float</span>:
+    mono = np.abs(left + right) * <span class="num">0.5</span>
+    envelope = np.maximum(<span class="num">0</span>, np.diff(mono))
+    peaks, _ = find_peaks(envelope, height=np.std(envelope)*<span class="num">1.5</span>, distance=<span class="kw">int</span>(sr*<span class="num">0.05</span>))
+    <span class="kw">return</span> round(len(peaks) / max(len(left)/sr, <span class="num">0.1</span>), <span class="num">1</span>)
+
+
+<span class="kw">def</span> <span class="fn">build_audio_profile</span>(left, right, sr, bit_depth=<span class="num">16</span>) -> <span class="tp">AudioProfile</span>:
+    <span class="kw">return</span> AudioProfile(
+        integrated_lufs   = measure_integrated_lufs(left, right, sr),
+        true_peak_dbtp    = measure_true_peak(left, right, sr),
+        short_term_lufs   = measure_short_term_lufs(left, right, sr),
+        crest_factor_db   = measure_true_peak(left, right, sr)
+                            - (<span class="num">10</span>*np.log10(max(np.mean(left**<span class="num">2</span>+right**<span class="num">2</span>),<span class="num">1e-10</span>))),
+        spectral_balance  = measure_spectral_balance(left, right, sr),
+        ms_ratio          = measure_ms_ratio(left, right),
+        low_density       = _measure_low_density(left, right, sr),
+        transient_density = measure_transient_density(left, right, sr),
+        sample_rate=sr, bit_depth=bit_depth,
+        duration_sec=round(len(left)/sr, <span class="num">2</span>), channel_count=<span class="num">2</span>,
+    )</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--               PART B: マスタリングチェーン                      -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">B</span>
+    <h3>マスタリングチェーン — 洗練された 10 段 DSP</h3>
+  </div>
+
+  <div class="chain">
+    <span class="chain-b">① M/S Split</span><span class="chain-a">→</span>
+    <span class="chain-b">② Gain</span><span class="chain-a">→</span>
+    <span class="chain-b hl">③ Tube Sat (4x OS)</span><span class="chain-a">→</span>
+    <span class="chain-b hl">④ 3-Band Comp</span><span class="chain-a">→</span>
+    <span class="chain-b hl">⑤ Parametric EQ</span><span class="chain-a">→</span>
+    <span class="chain-b hl">⑥ Stereo Width</span><span class="chain-a">→</span>
+    <span class="chain-b">⑦ Soft Clip</span><span class="chain-a">→</span>
+    <span class="chain-b hl">⑧ TP Limiter (4x OS)</span><span class="chain-a">→</span>
+    <span class="chain-b">⑨ Neuro-Drive</span><span class="chain-a">→</span>
+    <span class="chain-b">⑩ M/S Merge</span>
+  </div>
+
+  <div class="card card-a">
+    <h4>現行 6 段 → 洗練 10 段への進化</h4>
+    <table>
+      <thead><tr><th>段</th><th>処理</th><th>現行</th><th>改善</th><th>効果</th></tr></thead>
+      <tbody>
+        <tr><td>①</td><td>M/S Split</td><td><span class="tag tag-g">KEEP</span></td><td>—</td><td>ステレオ独立制御の基盤</td></tr>
+        <tr><td>②</td><td>Gain</td><td><span class="tag tag-g">KEEP</span></td><td>—</td><td>自己補正ループで ±12dB 制御</td></tr>
+        <tr><td>③</td><td>Tube Saturation</td><td><span class="tag tag-a">EVO</span></td><td>4x OS 追加。ベクトル化</td><td>エイリアシング排除。10-50x 高速化</td></tr>
+        <tr><td>④</td><td>3-Band Comp</td><td><span class="tag tag-r">NEW</span></td><td>LR4 クロスオーバー + 帯域別圧縮</td><td>帯域独立のダイナミクス制御</td></tr>
+        <tr><td>⑤</td><td>Parametric EQ</td><td><span class="tag tag-a">EVO</span></td><td>Pultec固定 → AI可変バンド</td><td>楽曲固有の周波数補正</td></tr>
+        <tr><td>⑥</td><td>Stereo Width</td><td><span class="tag tag-r">NEW</span></td><td>Side ゲイン制御 + Mono互換チェック</td><td>空間表現の精密制御</td></tr>
+        <tr><td>⑦</td><td>Soft Clipper</td><td><span class="tag tag-g">KEEP</span></td><td>—</td><td>トランジェント保護</td></tr>
+        <tr><td>⑧</td><td>TP Limiter</td><td><span class="tag tag-a">EVO</span></td><td>4x OS + Lookahead 追加</td><td>ISP ゼロ保証</td></tr>
+        <tr><td>⑨</td><td>Neuro-Drive</td><td><span class="tag tag-g">KEEP</span></td><td>wet 量を AI パラメータ化</td><td>柔軟な並列処理</td></tr>
+        <tr><td>⑩</td><td>M/S Merge</td><td><span class="tag tag-g">KEEP</span></td><td>—</td><td>L/R 再合成</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <pre><span class="cm"># ── mastering_chain.py — 洗練された 10 段 DSP ──</span>
+
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+<span class="kw">from</span> scipy.signal <span class="kw">import</span> sosfilt, butter, resample_poly
+<span class="kw">from</span> dataclasses <span class="kw">import</span> dataclass, field
+<span class="kw">from</span> typing <span class="kw">import</span> List
+
+<span class="dc">@dataclass</span>
+<span class="kw">class</span> <span class="tp">MasteringParams</span>:
+    <span class="str">"""AI 合議 + 自己補正ループで決定される全パラメータ"""</span>
+    gain_db: <span class="tp">float</span> = <span class="num">0.0</span>
+    tube_drive: <span class="tp">float</span> = <span class="num">0.35</span>
+    low_contour_db: <span class="tp">float</span> = <span class="num">1.5</span>
+    comp_low_threshold: <span class="tp">float</span> = -<span class="num">18.0</span>
+    comp_low_ratio: <span class="tp">float</span> = <span class="num">2.0</span>
+    comp_mid_threshold: <span class="tp">float</span> = -<span class="num">15.0</span>
+    comp_mid_ratio: <span class="tp">float</span> = <span class="num">1.5</span>
+    comp_high_threshold: <span class="tp">float</span> = -<span class="num">20.0</span>
+    comp_high_ratio: <span class="tp">float</span> = <span class="num">2.5</span>
+    eq_bands: <span class="tp">List[dict]</span> = field(default_factory=<span class="kw">lambda</span>: [
+        {<span class="str">"type"</span>: <span class="str">"hpf"</span>, <span class="str">"freq"</span>: <span class="num">30</span>, <span class="str">"q"</span>: <span class="num">0.707</span>},
+        {<span class="str">"type"</span>: <span class="str">"peaking"</span>, <span class="str">"freq"</span>: <span class="num">55</span>, <span class="str">"q"</span>: <span class="num">0.9</span>, <span class="str">"gain"</span>: <span class="num">1.5</span>},
+    ])
+    stereo_width: <span class="tp">float</span> = <span class="num">1.0</span>
+    limiter_ceiling_db: <span class="tp">float</span> = -<span class="num">1.0</span>
+    limiter_release_ms: <span class="tp">float</span> = <span class="num">50.0</span>
+    parallel_wet: <span class="tp">float</span> = <span class="num">0.20</span>
+    target_lufs: <span class="tp">float</span> = -<span class="num">14.0</span>
+
+
+<span class="cm"># ── ③ Tube Saturation (4x OS + ベクトル化) ──</span>
+
+<span class="kw">def</span> <span class="fn">apply_tube_saturation</span>(buf, drive, sr):
+    up = resample_poly(buf, <span class="num">4</span>, <span class="num">1</span>)
+    d = max(<span class="num">0.0</span>, min(<span class="num">1.0</span>, drive)) * <span class="num">4.0</span> + <span class="num">0.5</span>
+    sign = np.sign(up)
+    abs_x = np.abs(up)
+    saturated = sign * (<span class="num">1.0</span> - np.exp(-abs_x * d))
+    harmonics = saturated * (<span class="num">1.0</span> + <span class="num">0.15</span> * np.cos(np.pi * abs_x))
+    shaped = np.clip(harmonics, -<span class="num">1.0</span>, <span class="num">1.0</span>)
+    <span class="kw">return</span> resample_poly(shaped, <span class="num">1</span>, <span class="num">4</span>)[:len(buf)]
+
+
+<span class="cm"># ── ④ 3-Band Compressor (LR4 Crossover) ──</span>
+
+<span class="kw">def</span> <span class="fn">apply_multiband_comp</span>(buf, sr, params):
+    fc_low, fc_high = <span class="num">200.0</span>, <span class="num">4000.0</span>
+    lp1 = butter(<span class="num">2</span>, fc_low, btype=<span class="str">'low'</span>, fs=sr, output=<span class="str">'sos'</span>)
+    hp1 = butter(<span class="num">2</span>, fc_low, btype=<span class="str">'high'</span>, fs=sr, output=<span class="str">'sos'</span>)
+    lp2 = butter(<span class="num">2</span>, fc_high, btype=<span class="str">'low'</span>, fs=sr, output=<span class="str">'sos'</span>)
+    hp2 = butter(<span class="num">2</span>, fc_high, btype=<span class="str">'high'</span>, fs=sr, output=<span class="str">'sos'</span>)
+    low  = sosfilt(lp1, sosfilt(lp1, buf))
+    mid  = sosfilt(lp2, sosfilt(lp2, sosfilt(hp1, sosfilt(hp1, buf))))
+    high = sosfilt(hp2, sosfilt(hp2, buf))
+    low  = _compress_band(low, params.comp_low_threshold, params.comp_low_ratio)
+    mid  = _compress_band(mid, params.comp_mid_threshold, params.comp_mid_ratio)
+    high = _compress_band(high, params.comp_high_threshold, params.comp_high_ratio)
+    <span class="kw">return</span> low + mid + high
+
+
+<span class="cm"># ── ⑤ Parametric EQ (SOS Chain) ──</span>
+
+<span class="kw">def</span> <span class="fn">apply_parametric_eq</span>(buf, sr, bands):
+    sos_chain = []
+    <span class="kw">for</span> b <span class="kw">in</span> bands:
+        <span class="kw">if</span> b[<span class="str">"type"</span>] == <span class="str">"hpf"</span>:
+            sos_chain.append(butter(<span class="num">2</span>, b[<span class="str">"freq"</span>], btype=<span class="str">'high'</span>, fs=sr, output=<span class="str">'sos'</span>))
+        <span class="kw">elif</span> b[<span class="str">"type"</span>] == <span class="str">"peaking"</span>:
+            sos_chain.append(_peaking_to_sos(b[<span class="str">"freq"</span>], b[<span class="str">"q"</span>], b[<span class="str">"gain"</span>], sr))
+        <span class="kw">elif</span> b[<span class="str">"type"</span>] == <span class="str">"high_shelf"</span>:
+            sos_chain.append(_high_shelf_to_sos(b[<span class="str">"freq"</span>], b[<span class="str">"gain"</span>], sr))
+    <span class="kw">if not</span> sos_chain: <span class="kw">return</span> buf
+    <span class="kw">return</span> sosfilt(np.vstack(sos_chain), buf)
+
+
+<span class="cm"># ── ⑧ True Peak Limiter (4x OS + Lookahead) ──</span>
+
+<span class="kw">def</span> <span class="fn">apply_true_peak_limiter</span>(buf, sr, ceiling_db=-<span class="num">1.0</span>, lookahead_ms=<span class="num">5.0</span>):
+    ceiling = <span class="num">10</span> ** (ceiling_db / <span class="num">20</span>)
+    lookahead = <span class="kw">int</span>(lookahead_ms / <span class="num">1000</span> * sr)
+    up = resample_poly(buf, <span class="num">4</span>, <span class="num">1</span>)
+    peak_per = np.array([np.max(np.abs(up[i*<span class="num">4</span>:i*<span class="num">4</span>+<span class="num">4</span>])) <span class="kw">for</span> i <span class="kw">in</span> range(len(buf))])
+    <span class="cm"># Lookahead: 逆方向スキャンで未来のピークを把握</span>
+    peak_ahead = np.copy(peak_per)
+    <span class="kw">for</span> i <span class="kw">in</span> range(len(buf)-<span class="num">2</span>, -<span class="num">1</span>, -<span class="num">1</span>):
+        la_end = min(i + lookahead, len(buf))
+        peak_ahead[i] = np.max(peak_per[i:la_end])
+    gain = np.where(peak_ahead > ceiling, ceiling / (peak_ahead + <span class="num">1e-10</span>), <span class="num">1.0</span>)
+    <span class="cm"># スムージング</span>
+    <span class="kw">for</span> i <span class="kw">in</span> range(<span class="num">1</span>, len(gain)):
+        <span class="kw">if</span> gain[i] > gain[i-<span class="num">1</span>]:
+            gain[i] = <span class="num">0.9995</span> * gain[i-<span class="num">1</span>] + <span class="num">0.0005</span> * gain[i]
+    delayed = np.roll(buf, lookahead)
+    delayed[:lookahead] = <span class="num">0</span>
+    <span class="kw">return</span> delayed * gain
+
+
+<span class="cm"># ── 統合チェーン ──</span>
+
+<span class="kw">def</span> <span class="fn">master</span>(left, right, sr, params: <span class="tp">MasteringParams</span>):
+    <span class="str">"""10段 DSP チェーン"""</span>
+    mid  = (left + right) * <span class="num">0.5</span>           <span class="cm"># ① M/S Split</span>
+    side = (left - right) * <span class="num">0.5</span>
+
+    <span class="kw">for</span> ch <span class="kw">in</span> [mid, side]:
+        ch *= <span class="num">10</span> ** (params.gain_db / <span class="num">20</span>)      <span class="cm"># ② Gain</span>
+        ch[:] = apply_tube_saturation(ch, params.tube_drive, sr)  <span class="cm"># ③</span>
+        ch[:] = apply_multiband_comp(ch, sr, params)              <span class="cm"># ④</span>
+        ch[:] = apply_parametric_eq(ch, sr, params.eq_bands)      <span class="cm"># ⑤</span>
+        ch[:] = _apply_soft_clipper(ch, <span class="num">0.99</span>)                    <span class="cm"># ⑦</span>
+        ch[:] = apply_true_peak_limiter(ch, sr, params.limiter_ceiling_db) <span class="cm"># ⑧</span>
+        ch[:] = _apply_neuro_drive(ch, sr, params.parallel_wet)   <span class="cm"># ⑨</span>
+
+    side *= params.stereo_width              <span class="cm"># ⑥ Stereo Width</span>
+    left[:], right[:] = mid + side, mid - side  <span class="cm"># ⑩ M/S Merge</span></pre>
+
+  <div class="card card-g">
+    <h4>改良型・自己補正ループ</h4>
+    <p>二分探索 (6回) → リニア微調整 (最大15回) のハイブリッド。3区間サンプリングで偏り排除。反復回数 50 → ~15 に削減。</p>
+  </div>
+
+  <pre><span class="kw">def</span> <span class="fn">optimize</span>(left, right, sr, params: <span class="tp">MasteringParams</span>) -> <span class="tp">tuple</span>:
+    <span class="kw">import</span> dataclasses <span class="kw">as</span> dc
+    target = params.target_lufs
+
+    <span class="cm"># 3区間サンプリング (序盤15% / 中盤50% / 終盤80%)</span>
+    seg_len = min(len(left), <span class="num">5</span> * sr)
+    offsets = [<span class="kw">int</span>(len(left)*<span class="num">0.15</span>), <span class="kw">int</span>(len(left)*<span class="num">0.50</span>)-seg_len//<span class="num">2</span>,
+               <span class="kw">int</span>(len(left)*<span class="num">0.80</span>)-seg_len]
+    segments = [(left[o:o+seg_len].copy(), right[o:o+seg_len].copy())
+                <span class="kw">for</span> o <span class="kw">in</span> offsets <span class="kw">if</span> <span class="num">0</span> <= o <span class="kw">and</span> o+seg_len <= len(left)]
+
+    <span class="kw">def</span> <span class="fn">simulate</span>(g):
+        p = dc.replace(params, gain_db=g)
+        ms = []
+        <span class="kw">for</span> ls, rs <span class="kw">in</span> segments:
+            lw, rw = ls.copy(), rs.copy()
+            master(lw, rw, sr, p)
+            ms.append(measure_integrated_lufs(lw, rw, sr))
+        <span class="kw">return</span> np.mean(ms)
+
+    <span class="cm"># Phase 1: 二分探索 (6回 → ±0.375 dB)</span>
+    lo, hi = -<span class="num">12.0</span>, <span class="num">12.0</span>
+    <span class="kw">for</span> _ <span class="kw">in</span> range(<span class="num">6</span>):
+        mid_g = (lo + hi) / <span class="num">2</span>
+        <span class="kw">if</span> simulate(mid_g) < target: lo = mid_g
+        <span class="kw">else</span>: hi = mid_g
+
+    <span class="cm"># Phase 2: 0.1dB リニア微調整 (最大15回)</span>
+    best_gain, best_lufs, iters = (lo+hi)/<span class="num">2</span>, simulate((lo+hi)/<span class="num">2</span>), <span class="num">6</span>
+    <span class="kw">for</span> _ <span class="kw">in</span> range(<span class="num">15</span>):
+        err = target - best_lufs
+        <span class="kw">if</span> abs(err) <= <span class="num">0.1</span>: <span class="kw">break</span>
+        best_gain = np.clip(best_gain + np.sign(err)*<span class="num">0.1</span>, -<span class="num">12</span>, <span class="num">12</span>)
+        best_lufs = simulate(best_gain)
+        iters += <span class="num">1</span>
+
+    <span class="kw">return</span> dc.replace(params, gain_db=best_gain), best_lufs, iters</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--              PART C: 合議 (Multi-Agent Consensus)              -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">C</span>
+    <h3>合議ロジック — 4エージェント・コンセンサスシステム</h3>
+  </div>
+
+  <div class="card card-p">
+    <h4>設計思想</h4>
+    <p>
+      単一の AI プロンプトでパラメータを生成するのは脆弱。1回の生成で外れ値が出ると音質が破綻する。
+      <strong>4つの専門エージェント</strong>がそれぞれ独立にパラメータを提案し、
+      <strong>メディエーター</strong>が合議で最終パラメータを決定する。
+      これにより外れ値の影響を抑え、多角的な音質判断が可能になる。
+    </p>
+  </div>
+
+  <div class="grid-2" style="margin:16px 0;">
+    <div class="agent-card a1">
+      <h5 style="color:var(--cyan);">Agent 1 — Loudness Engineer</h5>
+      <p>
+        <strong>専門：</strong>ラウドネス・ダイナミクスの最適化<br>
+        <strong>入力：</strong>LUFS, Crest Factor, Short-term LUFS 列<br>
+        <strong>決定：</strong><code>gain_db</code>, <code>comp_*_threshold</code>, <code>comp_*_ratio</code>
+      </p>
+    </div>
+    <div class="agent-card a2">
+      <h5 style="color:var(--orange);">Agent 2 — Tonal Balance</h5>
+      <p>
+        <strong>専門：</strong>周波数バランスの補正<br>
+        <strong>入力：</strong>スペクトラル・バランス, 低域密度<br>
+        <strong>決定：</strong><code>eq_bands[]</code>, <code>low_contour_db</code>
+      </p>
+    </div>
+    <div class="agent-card a3">
+      <h5 style="color:var(--pink);">Agent 3 — Character & Texture</h5>
+      <p>
+        <strong>専門：</strong>音の個性・質感の付加<br>
+        <strong>入力：</strong>ジャンル推定, トランジェント密度, M/S 比<br>
+        <strong>決定：</strong><code>tube_drive</code>, <code>parallel_wet</code>, <code>limiter_ceiling_db</code>
+      </p>
+    </div>
+    <div class="agent-card a4">
+      <h5 style="color:var(--green);">Agent 4 — Spatial & Stereo</h5>
+      <p>
+        <strong>専門：</strong>ステレオイメージ・空間表現<br>
+        <strong>入力：</strong>M/S エネルギー比<br>
+        <strong>決定：</strong><code>stereo_width</code>
+      </p>
+    </div>
+  </div>
+
+  <div class="card card-o">
+    <h4>合議フロー</h4>
+    <p>
+      <strong>Step 1:</strong> 8次元プロファイルを生成 (<code>build_audio_profile</code>)<br>
+      <strong>Step 2:</strong> 4エージェントを<strong>並列</strong>実行（各エージェントが独立にパラメータ提案）<br>
+      <strong>Step 3:</strong> メディエーターが統合 — クロスバリデーション + 安全クランプ<br>
+      <strong>Step 4:</strong> 自己補正ループが <code>gain_db</code> を自動調整
+    </p>
+  </div>
+
+  <pre><span class="cm"># ── consensus_engine.py — メディエーター（合議ロジック） ──</span>
+
+<span class="kw">def</span> <span class="fn">mediate</span>(opinions: <span class="tp">List[dict]</span>, profile: <span class="tp">AudioProfile</span>) -> <span class="tp">MasteringParams</span>:
+    <span class="str">"""4エージェントの提案を統合して最終パラメータを決定"""</span>
+
+    <span class="cm"># 1. 成功したエージェントのみ採用</span>
+    valid = [o <span class="kw">for</span> o <span class="kw">in</span> opinions <span class="kw">if</span> o[<span class="str">"confidence"</span>] > <span class="num">0</span>]
+    <span class="kw">if</span> len(valid) == <span class="num">0</span>:
+        <span class="kw">return</span> _fallback_params(profile)
+
+    <span class="cm"># 2. パラメータを統合（各エージェントの担当領域をマージ）</span>
+    merged = {}
+    <span class="kw">for</span> opinion <span class="kw">in</span> valid:
+        merged.update(opinion[<span class="str">"params"</span>])
+
+    <span class="cm"># 3. クロスバリデーション（エージェント間の矛盾を検出・修正）</span>
+    merged = _cross_validate(merged, profile)
+
+    <span class="cm"># 4. 安全レンジにクランプ</span>
+    merged = _clamp_params(merged)
+
+    <span class="kw">return</span> MasteringParams(**{
+        k: v <span class="kw">for</span> k, v <span class="kw">in</span> merged.items()
+        <span class="kw">if</span> k <span class="kw">in</span> MasteringParams.__dataclass_fields__
+    })
+
+
+<span class="kw">def</span> <span class="fn">_cross_validate</span>(params, profile):
+    <span class="str">"""エージェント間の矛盾を検出し修正"""</span>
+    p = params.copy()
+
+    <span class="cm"># 矛盾1: tube_drive が高い + parallel_wet も高い → 歪みすぎ</span>
+    <span class="kw">if</span> p.get(<span class="str">"tube_drive"</span>, <span class="num">0</span>) > <span class="num">0.5</span> <span class="kw">and</span> p.get(<span class="str">"parallel_wet"</span>, <span class="num">0</span>) > <span class="num">0.25</span>:
+        p[<span class="str">"parallel_wet"</span>] = min(p[<span class="str">"parallel_wet"</span>], <span class="num">0.35</span> - p[<span class="str">"tube_drive"</span>] * <span class="num">0.3</span>)
+
+    <span class="cm"># 矛盾2: 広いステレオ + 低域ブースト → 位相問題</span>
+    <span class="kw">if</span> p.get(<span class="str">"stereo_width"</span>, <span class="num">1</span>) > <span class="num">1.15</span> <span class="kw">and</span> p.get(<span class="str">"low_contour_db"</span>, <span class="num">0</span>) > <span class="num">1.5</span>:
+        p[<span class="str">"low_contour_db"</span>] = min(p[<span class="str">"low_contour_db"</span>], <span class="num">1.0</span>)
+
+    <span class="cm"># 矛盾3: 強い圧縮 + 緩いリミッター → ピーク管理不整合</span>
+    max_ratio = max(p.get(<span class="str">"comp_low_ratio"</span>,<span class="num">1</span>), p.get(<span class="str">"comp_mid_ratio"</span>,<span class="num">1</span>), p.get(<span class="str">"comp_high_ratio"</span>,<span class="num">1</span>))
+    <span class="kw">if</span> max_ratio > <span class="num">4.0</span> <span class="kw">and</span> p.get(<span class="str">"limiter_ceiling_db"</span>, -<span class="num">1</span>) > -<span class="num">0.5</span>:
+        p[<span class="str">"limiter_ceiling_db"</span>] = -<span class="num">1.0</span>
+
+    <span class="kw">return</span> p
+
+
+PARAM_RANGES = {
+    <span class="str">"gain_db"</span>: (-<span class="num">12</span>, <span class="num">12</span>), <span class="str">"tube_drive"</span>: (<span class="num">0</span>, <span class="num">0.8</span>),
+    <span class="str">"low_contour_db"</span>: (<span class="num">0</span>, <span class="num">2.5</span>),
+    <span class="str">"comp_low_threshold"</span>: (-<span class="num">30</span>, <span class="num">0</span>), <span class="str">"comp_low_ratio"</span>: (<span class="num">1</span>, <span class="num">8</span>),
+    <span class="str">"comp_mid_threshold"</span>: (-<span class="num">30</span>, <span class="num">0</span>), <span class="str">"comp_mid_ratio"</span>: (<span class="num">1</span>, <span class="num">8</span>),
+    <span class="str">"comp_high_threshold"</span>: (-<span class="num">30</span>, <span class="num">0</span>), <span class="str">"comp_high_ratio"</span>: (<span class="num">1</span>, <span class="num">8</span>),
+    <span class="str">"stereo_width"</span>: (<span class="num">0.8</span>, <span class="num">1.25</span>), <span class="str">"limiter_ceiling_db"</span>: (-<span class="num">2</span>, -<span class="num">0.3</span>),
+    <span class="str">"parallel_wet"</span>: (<span class="num">0</span>, <span class="num">0.35</span>),
+}</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--                   PART D: 統合パイプライン                      -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">D</span>
+    <h3>統合パイプライン — 解析 → 合議 → マスタリング → 検証</h3>
+  </div>
+
+  <pre><span class="kw">async def</span> <span class="fn">full_pipeline</span>(left, right, sr, bit_depth, gemini):
+    <span class="str">"""Upload → Download までの全処理を統合実行"""</span>
+
+    <span class="cm"># ── Phase 1: 解析 ──</span>
+    profile = build_audio_profile(left, right, sr, bit_depth)
+
+    <span class="cm"># ── Phase 2: 合議 (4エージェント並列) ──</span>
+    opinions = <span class="kw">await</span> run_all_agents(profile, gemini)
+    params = mediate(opinions, profile)
+
+    <span class="cm"># ── Phase 3: 自己補正ループ + マスタリング ──</span>
+    optimized, achieved_lufs, iters = optimize(left, right, sr, params)
+    master(left, right, sr, optimized)
+
+    <span class="cm"># ── Phase 4: 事後検証 ──</span>
+    post_profile = build_audio_profile(left, right, sr, bit_depth)
+
+    <span class="kw">return</span> {
+        <span class="str">"pre_analysis"</span>: asdict(profile),
+        <span class="str">"post_analysis"</span>: asdict(post_profile),
+        <span class="str">"agent_opinions"</span>: opinions,
+        <span class="str">"final_params"</span>: asdict(optimized),
+        <span class="str">"achieved_lufs"</span>: achieved_lufs,
+        <span class="str">"iterations"</span>: iters,
+        <span class="str">"lufs_delta"</span>: post_profile.integrated_lufs - profile.integrated_lufs,
+        <span class="str">"true_peak_safe"</span>: post_profile.true_peak_dbtp <= optimized.limiter_ceiling_db + <span class="num">0.1</span>,
+    }</pre>
+
+  <div class="highlight">
+    <h4 style="margin-bottom:8px;">品質ゲート — リリース前チェック</h4>
+    <table>
+      <thead><tr><th>チェック項目</th><th>合格基準</th><th>失敗時アクション</th></tr></thead>
+      <tbody>
+        <tr><td>LUFS 達成精度</td><td>目標 ±0.5 LU</td><td>自己補正ループを max_iter=50 で再実行</td></tr>
+        <tr><td>True Peak</td><td>≤ ceiling + 0.1 dBTP</td><td>ceiling を 0.5dB 下げて再処理</td></tr>
+        <tr><td>Mono 互換性</td><td>L+R 合成時にエネルギー損失 ≤ 3dB</td><td>stereo_width を 0.05 ずつ縮小</td></tr>
+        <tr><td>Crest Factor</td><td>入力比 ±6dB 以内</td><td>comp ratio を 10% 緩和</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--                      PART E: 実装戦略                          -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">E</span>
+    <h3>実装ロードマップ</h3>
+  </div>
+
+  <div class="grid-3">
+    <div class="card card-g">
+      <h4>Phase 1 — 即効改善 (1-2週間)</h4>
+      <ul>
+        <li><strong>P0:</strong> apply_wave_shaper の NumPy ベクトル化 → 10-50x 高速化</li>
+        <li><strong>P0:</strong> apply_biquad → sosfilt 置換 → 50-100x 高速化</li>
+        <li><strong>P0:</strong> Tube Saturation に 4x OS 追加</li>
+        <li><strong>P1:</strong> LUFS 測定を BS.1770-4 準拠に</li>
+      </ul>
+    </div>
+    <div class="card card-a">
+      <h4>Phase 2 — 音質の飛躍 (2-4週間)</h4>
+      <ul>
+        <li><strong>P1:</strong> 3-Band Compressor 追加</li>
+        <li><strong>P1:</strong> True Peak Limiter v2 (4x OS + Lookahead)</li>
+        <li><strong>P1:</strong> Parametric EQ の AI 可変バンド化</li>
+        <li><strong>P1:</strong> Stereo Width 制御</li>
+      </ul>
+    </div>
+    <div class="card card-p">
+      <h4>Phase 3 — 合議システム (1-2ヶ月)</h4>
+      <ul>
+        <li><strong>P2:</strong> 8次元プロファイラー実装</li>
+        <li><strong>P2:</strong> 4エージェント並列実行</li>
+        <li><strong>P2:</strong> メディエーター + クロスバリデーション</li>
+        <li><strong>P2:</strong> 品質ゲート + 事後検証</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  NEURO-MASTER · Core Logic Specification v1.0 · February 2026<br>
+  解析 → マスタリング → 合議 — 洗練されたロジック仕様書
+</div>
+
+</body>
+</html>

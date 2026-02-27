@@ -1,5 +1,5 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+/// <reference types="@supabase/functions-js/edge-runtime.d.ts" />
+import { createClient } from "@supabase/supabase-js";
 
 /**
  * process-mastering v7 — Cloud Run ブリッジ
